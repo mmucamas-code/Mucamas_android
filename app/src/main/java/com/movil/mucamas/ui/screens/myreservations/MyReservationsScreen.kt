@@ -30,6 +30,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,6 +41,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.movil.mucamas.ui.screens.rate.RateServiceScreen
 import com.movil.mucamas.ui.theme.OrangeAccent
 import com.movil.mucamas.ui.theme.TurquoiseMain
 
@@ -62,32 +67,58 @@ fun MyReservationsScreen() {
         Reservation("2", "Cocina", "10 Nov 2023", "02:00 PM", ReservationStatus.COMPLETED, Icons.Default.Star),
         Reservation("3", "Planchado", "18 Nov 2023", "09:00 AM", ReservationStatus.IN_PROGRESS, Icons.Default.DateRange)
     )
+    
+    var showRateModal by remember { mutableStateOf(false) }
+    var selectedServiceToRate by remember { mutableStateOf<Reservation?>(null) }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF8F9FA)), // Fondo suave
-        contentPadding = PaddingValues(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "Mis Reservas",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFF8F9FA)), // Fondo suave
+            contentPadding = PaddingValues(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "Mis Reservas",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
                 )
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            items(reservations) { reservation ->
+                ReservationCard(
+                    reservation = reservation,
+                    onRateClick = {
+                        selectedServiceToRate = reservation
+                        showRateModal = true
+                    }
+                )
+            }
+            
+            item {
+                 Spacer(modifier = Modifier.height(24.dp))
+            }
         }
 
-        items(reservations) { reservation ->
-            ReservationCard(reservation = reservation)
-        }
-        
-        item {
-             Spacer(modifier = Modifier.height(24.dp))
+        if (showRateModal && selectedServiceToRate != null) {
+            RateServiceScreen(
+                serviceName = selectedServiceToRate!!.serviceName,
+                onDismissRequest = { 
+                    showRateModal = false
+                    selectedServiceToRate = null
+                },
+                onSubmit = { rating, comment ->
+                    // TODO: Handle rating submission
+                    showRateModal = false
+                    selectedServiceToRate = null
+                }
+            )
         }
     }
 }
@@ -96,7 +127,8 @@ fun MyReservationsScreen() {
 fun ReservationCard(
     reservation: Reservation,
     onCancelClick: () -> Unit = {},
-    onDetailClick: () -> Unit = {}
+    onDetailClick: () -> Unit = {},
+    onRateClick: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -185,6 +217,17 @@ fun ReservationCard(
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red.copy(alpha = 0.7f))
                     ) {
                         Text("Cancelar", fontSize = 12.sp)
+                    }
+                } else if (reservation.status == ReservationStatus.COMPLETED) {
+                    Button(
+                        onClick = onRateClick,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
+                    ) {
+                        Text("Calificar", fontSize = 12.sp)
                     }
                 }
                 
