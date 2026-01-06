@@ -29,7 +29,12 @@ fun AppNavHost(
                 onSignUpClick = { /* TODO: Implement navigation to sign up */ }
             )
         }
-        composable(Screen.Home.route) { HomeScreen() }
+        composable(Screen.Home.route) {
+            HomeScreen(
+                onServiceClick = { navController.navigate(Screen.SelectService.route) },
+                onMyReservationsClick = { navController.navigate(Screen.MyReservations.route) }
+            )
+        }
         composable(Screen.SelectService.route) { SelectServiceScreen() }
         composable(Screen.SelectDate.route) { SelectDateScreen() }
         composable(Screen.ConfirmReservation.route) { ConfirmReservationScreen() }
