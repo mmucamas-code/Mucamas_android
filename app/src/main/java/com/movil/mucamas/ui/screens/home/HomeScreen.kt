@@ -51,7 +51,8 @@ data class ServiceItem(
 @Composable
 fun HomeScreen(
     onServiceClick: (String) -> Unit = {},
-    onMyReservationsClick: () -> Unit = {}
+    onMyReservationsClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {}
 ) {
     val services = listOf(
         ServiceItem("Limpieza", Icons.Default.Home, TurquoiseMain),
@@ -64,7 +65,7 @@ fun HomeScreen(
             BottomNavigationBar(
                 onHomeClick = {}, // Ya estamos en home
                 onReservationsClick = onMyReservationsClick,
-                onProfileClick = { /* TODO: Navigate to Profile */ }
+                onProfileClick = onProfileClick
             )
         }
     ) { innerPadding ->

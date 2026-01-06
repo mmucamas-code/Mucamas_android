@@ -10,6 +10,7 @@ import com.movil.mucamas.ui.screens.login.LoginScreen
 import com.movil.mucamas.ui.screens.login.RegisterIdentityScreen
 import com.movil.mucamas.ui.screens.login.RegisterLocationScreen
 import com.movil.mucamas.ui.screens.myreservations.MyReservationsScreen
+import com.movil.mucamas.ui.screens.profile.ProfileScreen
 import com.movil.mucamas.ui.screens.rate.RateServiceScreen
 import com.movil.mucamas.ui.screens.reservation.ConfirmReservationScreen
 import com.movil.mucamas.ui.screens.reservation.SelectDateScreen
@@ -58,9 +59,23 @@ fun AppNavHost(
         composable(Screen.Home.route) {
             HomeScreen(
                 onServiceClick = { navController.navigate(Screen.SelectService.route) },
-                onMyReservationsClick = { navController.navigate(Screen.MyReservations.route) }
+                onMyReservationsClick = { navController.navigate(Screen.MyReservations.route) },
+                onProfileClick = { navController.navigate(Screen.Profile.route) }
             )
         }
+        
+        composable(Screen.Profile.route) {
+            ProfileScreen(
+                onLogoutClick = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
+                onHomeClick = { navController.navigate(Screen.Home.route) },
+                onReservationsClick = { navController.navigate(Screen.MyReservations.route) }
+            )
+        }
+
         composable(Screen.SelectService.route) { SelectServiceScreen() }
         composable(Screen.SelectDate.route) { SelectDateScreen() }
         composable(Screen.ConfirmReservation.route) { ConfirmReservationScreen() }
