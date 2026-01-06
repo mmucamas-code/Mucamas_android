@@ -8,7 +8,6 @@ import androidx.navigation.compose.composable
 import com.movil.mucamas.ui.screens.WelcomeScreen
 import com.movil.mucamas.ui.screens.home.HomeScreen
 import com.movil.mucamas.ui.screens.login.LoginScreen
-import com.movil.mucamas.ui.screens.login.OtpVerificationScreen
 import com.movil.mucamas.ui.screens.login.RegisterIdentityScreen
 import com.movil.mucamas.ui.screens.login.RegisterLocationScreen
 import com.movil.mucamas.ui.screens.myreservations.MyReservationsScreen
@@ -39,28 +38,24 @@ fun AppNavHost(
         // Login Flow
         composable(Screen.Login.route) {
             LoginScreen(
-                onLoginClick = { navController.navigate(Screen.OtpVerification.route) },
-                onSignUpClick = { navController.navigate(Screen.RegisterIdentity.route) }
-            )
-        }
-        
-        // OTP
-        composable(Screen.OtpVerification.route) {
-            OtpVerificationScreen(
-                onVerifyClick = { 
-                    // Al verificar, vamos al Home y limpiamos la pila de login
+                onLoginSuccess = { 
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Welcome.route) { inclusive = true }
                     }
                 },
-                onCancelClick = { navController.popBackStack() }
+                onSignUpClick = { navController.navigate(Screen.RegisterIdentity.route) }
             )
         }
         
         // Registration Flow
         composable(Screen.RegisterIdentity.route) {
             RegisterIdentityScreen(
-                onNextClick = { navController.navigate(Screen.OtpVerification.route) },
+                onNextClick = {
+                    // Al verificar, vamos al Home y limpiamos la pila de login
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Welcome.route) { inclusive = true }
+                    }
+                },
                 onLoginClick = { navController.navigate(Screen.Login.route) },
                 //onScanClick = { /* TODO: Implement Scan logic */ },
                 //onGalleryClick = { /* TODO: Implement Gallery logic */ }

@@ -1,29 +1,24 @@
 package com.movil.mucamas.ui.screens.login
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -52,6 +47,7 @@ fun RegisterIdentityScreen(
     var identification by remember { mutableStateOf("") }
     var fullName by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
+    var showOtpDialog by remember { mutableStateOf(false) }
 
     // Acceso a utilidades adaptativas
     val spacing = AdaptiveTheme.spacing
@@ -61,7 +57,7 @@ fun RegisterIdentityScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background), // Fondo desde el tema
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Card(
@@ -82,7 +78,7 @@ fun RegisterIdentityScreen(
                     text = "Create Account",
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary, // Color primario (SoftBlack)
+                        color = MaterialTheme.colorScheme.primary,
                         fontSize = typography.headline
                     ),
                     textAlign = TextAlign.Center
@@ -95,7 +91,7 @@ fun RegisterIdentityScreen(
                     text = "Create an account so you can explore all the existing jobs",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, // Texto secundario
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = typography.body
                     ),
                     textAlign = TextAlign.Center
@@ -132,9 +128,9 @@ fun RegisterIdentityScreen(
 
                 Spacer(modifier = Modifier.height(spacing.large))
 
-                // Botón Sign Up
+                // Botón Sign Up (Abre OTP Dialog)
                 Button(
-                    onClick = onNextClick,
+                    onClick = { showOtpDialog = true },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(dimens.buttonHeight),
@@ -167,6 +163,21 @@ fun RegisterIdentityScreen(
                     )
                 }
             }
+        }
+        
+        if (showOtpDialog) {
+            // Reutilizamos el OtpDialog de LoginScreen (o si prefieres moverlo a un archivo común)
+            // Para mantener consistencia sin duplicar código, OtpDialog debería ser público en LoginScreen.kt o movido a un archivo de componentes.
+            // Por ahora, asumiré que OtpDialog está disponible o lo moveré a un archivo común si falla.
+            // NOTA: Como OtpDialog es un componente privado en LoginScreen.kt en el paso anterior,
+            // lo ideal es moverlo a un archivo compartido. Voy a hacer eso a continuación.
+            OtpDialog(
+                onDismissRequest = { showOtpDialog = false },
+                onVerify = {
+                    showOtpDialog = false
+                    onNextClick() // Esta acción llevará al Home
+                }
+            )
         }
     }
 }
