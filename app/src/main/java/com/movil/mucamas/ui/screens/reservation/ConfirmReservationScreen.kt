@@ -18,12 +18,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Place
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -36,8 +35,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.movil.mucamas.ui.theme.OrangeAccent
-import com.movil.mucamas.ui.theme.TurquoiseMain
 
 @Composable
 fun ConfirmReservationScreen(
@@ -51,7 +48,7 @@ fun ConfirmReservationScreen(
                     .fillMaxWidth()
                     .padding(16.dp)
                     .height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                 shape = RoundedCornerShape(28.dp)
             ) {
                 Text(
@@ -69,7 +66,7 @@ fun ConfirmReservationScreen(
                 .padding(horizontal = 24.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp)) // Espaciado superior generoso
 
             Text(
                 text = "Resumen de reserva",
@@ -89,7 +86,7 @@ fun ConfirmReservationScreen(
                 subDetail = "Limpieza profunda"
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // Resumen Fecha
             ReservationDetailCard(
@@ -99,7 +96,7 @@ fun ConfirmReservationScreen(
                 subDetail = "10:00 AM"
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // Resumen Dirección
             ReservationDetailCard(
@@ -109,20 +106,20 @@ fun ConfirmReservationScreen(
                 subDetail = "Av. Principal 123, Ciudad"
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(40.dp))
 
-            Divider(color = Color.LightGray.copy(alpha = 0.5f))
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // Resumen de Pago
             PaymentSummaryRow(label = "Subtotal", amount = "$35.00")
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             PaymentSummaryRow(label = "Tasa de servicio", amount = "$2.50")
             
-            Spacer(modifier = Modifier.height(16.dp))
-            Divider(color = Color.LightGray.copy(alpha = 0.5f))
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -137,7 +134,7 @@ fun ConfirmReservationScreen(
                     text = "$37.50",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = TurquoiseMain
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
             
@@ -155,31 +152,32 @@ fun ReservationDetailCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = TurquoiseMain,
-                modifier = Modifier.size(24.dp)
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
             )
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(20.dp))
             Column {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelLarge,
                     color = Color.Gray
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = detail,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = subDetail,

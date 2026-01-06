@@ -76,7 +76,7 @@ fun SelectServiceScreen(
                     .padding(16.dp)
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedServiceId != null) OrangeAccent else Color.Gray
+                    containerColor = if (selectedServiceId != null) MaterialTheme.colorScheme.secondary else Color.Gray
                 ),
                 enabled = selectedServiceId != null,
                 shape = RoundedCornerShape(28.dp)
@@ -97,7 +97,7 @@ fun SelectServiceScreen(
             verticalArrangement = Arrangement.Top
         ) {
             item {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(32.dp))
                 Text(
                     text = "Encuentra el servicio perfecto",
                     style = MaterialTheme.typography.headlineMedium.copy(
@@ -114,11 +114,11 @@ fun SelectServiceScreen(
                     isSelected = selectedServiceId == service.id,
                     onClick = { selectedServiceId = service.id }
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(20.dp))
             }
 
             item {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 Text(
                     text = "Servicios adicionales",
                     style = MaterialTheme.typography.titleLarge.copy(
@@ -136,11 +136,11 @@ fun SelectServiceScreen(
                     onClick = { selectedServiceId = service.id },
                     isCompact = true
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
             
             item {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
@@ -153,18 +153,18 @@ fun SelectableServiceCard(
     onClick: () -> Unit,
     isCompact: Boolean = false
 ) {
-    val borderColor = if (isSelected) TurquoiseMain else Color.Transparent
-    val backgroundColor = if (isSelected) TurquoiseMain.copy(alpha = 0.05f) else Color(0xFFF8F9FA) // Fondo claro
+    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(if (isCompact) 80.dp else 140.dp)
-            .clip(RoundedCornerShape(24.dp))
+            .height(if (isCompact) 90.dp else 160.dp) // Cards más grandes
+            .clip(RoundedCornerShape(28.dp)) // Más redondeado
             .background(backgroundColor)
-            .border(2.dp, borderColor, RoundedCornerShape(24.dp))
+            .border(2.dp, borderColor, RoundedCornerShape(28.dp))
             .clickable(onClick = onClick)
-            .padding(20.dp),
+            .padding(24.dp), // Más padding interno
         contentAlignment = Alignment.CenterStart
     ) {
         Row(
@@ -172,7 +172,7 @@ fun SelectableServiceCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(if (isCompact) 48.dp else 64.dp)
+                    .size(if (isCompact) 56.dp else 72.dp) // Icono container más grande
                     .background(service.color.copy(alpha = 0.15f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -180,25 +180,25 @@ fun SelectableServiceCard(
                     imageVector = service.icon,
                     contentDescription = null,
                     tint = service.color,
-                    modifier = Modifier.size(if (isCompact) 24.dp else 32.dp)
+                    modifier = Modifier.size(if (isCompact) 28.dp else 36.dp) // Icono más grande
                 )
             }
             
-            Spacer(modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.size(20.dp))
 
             Column {
                 Text(
                     text = service.name,
-                    fontSize = if (isCompact) 16.sp else 20.sp,
+                    fontSize = if (isCompact) 18.sp else 22.sp, // Texto más grande
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 if (!isCompact) {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = service.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray
+                        style = MaterialTheme.typography.bodyLarge, // Texto descriptivo más grande
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

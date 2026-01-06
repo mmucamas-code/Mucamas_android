@@ -45,7 +45,7 @@ import com.movil.mucamas.ui.screens.rate.RateServiceScreen
 import com.movil.mucamas.ui.theme.OrangeAccent
 import com.movil.mucamas.ui.theme.TurquoiseMain
 
-enum class ReservationStatus(val label: String, val color: Color) {
+enum class ReservationStatus(val label: String, val color: Color?) {
     PENDING("Pendiente", OrangeAccent),
     IN_PROGRESS("En Progreso", TurquoiseMain),
     COMPLETED("Completado", Color.Gray)
@@ -76,8 +76,8 @@ fun MyReservationsScreen() {
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xFFF8F9FA)), // Fondo suave
-            contentPadding = PaddingValues(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            contentPadding = PaddingValues(24.dp), // Padding generoso
+            verticalArrangement = Arrangement.spacedBy(20.dp) // Mayor separación
         ) {
             item {
                 Spacer(modifier = Modifier.height(24.dp))
@@ -132,12 +132,12 @@ fun ReservationCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(24.dp), // Bordes más redondeados
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(20.dp)
+            modifier = Modifier.padding(24.dp) // Mayor padding interno
         ) {
             // Header con Icono y Estado
             Row(
@@ -148,86 +148,98 @@ fun ReservationCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
-                            .background(reservation.status.color.copy(alpha = 0.1f), CircleShape),
+                            .size(48.dp) // Icono más grande
+                            .background(
+                                (reservation.status.color ?: MaterialTheme.colorScheme.outline).copy(alpha = 0.1f), 
+                                CircleShape
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = reservation.icon,
                             contentDescription = null,
-                            tint = reservation.status.color,
-                            modifier = Modifier.size(20.dp)
+                            tint = reservation.status.color ?: MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.size(24.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
                     Text(
                         text = reservation.serviceName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                
-                // Chip de estado
-                Box(
-                    modifier = Modifier
-                        .background(reservation.status.color.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = reservation.status.label,
-                        color = reservation.status.color,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.titleLarge, // Texto más grande
+                        fontWeight = FontWeight.Bold,
+                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Chip de estado alineado a la izquierda (debajo del título si es largo, o en nueva fila)
+             Box(
+                modifier = Modifier
+                    .background(
+                        (reservation.status.color ?: MaterialTheme.colorScheme.outline).copy(alpha = 0.1f), 
+                        RoundedCornerShape(8.dp)
+                    )
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = reservation.status.label,
+                    color = reservation.status.color ?: MaterialTheme.colorScheme.outline,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
             
             // Detalles de Fecha
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Default.DateRange, 
                     contentDescription = null, 
-                    tint = Color.Gray,
-                    modifier = Modifier.size(16.dp)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = "${reservation.date} • ${reservation.time}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray
+                    style = MaterialTheme.typography.bodyLarge, // Texto más legible
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Botones de Acción
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 if (reservation.status == ReservationStatus.PENDING) {
                     OutlinedButton(
                         onClick = onCancelClick,
                         modifier = Modifier
                             .weight(1f)
-                            .height(40.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red.copy(alpha = 0.7f))
+                            .height(48.dp), // Botón más alto
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
                     ) {
-                        Text("Cancelar", fontSize = 12.sp)
+                        Text("Cancelar", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     }
                 } else if (reservation.status == ReservationStatus.COMPLETED) {
                     Button(
                         onClick = onRateClick,
                         modifier = Modifier
                             .weight(1f)
-                            .height(40.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent)
+                            .height(48.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                     ) {
-                        Text("Calificar", fontSize = 12.sp)
+                        Text("Calificar", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
                 
@@ -235,11 +247,11 @@ fun ReservationCard(
                     onClick = onDetailClick,
                     modifier = Modifier
                         .weight(1f)
-                        .height(40.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = TurquoiseMain)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text("Ver detalle", fontSize = 12.sp)
+                    Text("Ver detalle", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

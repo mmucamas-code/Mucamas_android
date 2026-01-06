@@ -5,8 +5,10 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.movil.mucamas.ui.screens.WelcomeScreen
 import com.movil.mucamas.ui.screens.home.HomeScreen
 import com.movil.mucamas.ui.screens.login.LoginScreen
+import com.movil.mucamas.ui.screens.login.OtpVerificationScreen
 import com.movil.mucamas.ui.screens.login.RegisterIdentityScreen
 import com.movil.mucamas.ui.screens.login.RegisterLocationScreen
 import com.movil.mucamas.ui.screens.myreservations.MyReservationsScreen
@@ -23,21 +25,43 @@ fun AppNavHost(
 ) {
     NavHost(
         navController = navController,
-        startDestination = Screen.Login.route,
+        startDestination = Screen.Welcome.route, // Nuevo punto de inicio
         modifier = modifier
     ) {
+        // Welcome
+        composable(Screen.Welcome.route) {
+            WelcomeScreen(
+                onLoginClick = { navController.navigate(Screen.Login.route) },
+                onRegisterClick = { navController.navigate(Screen.RegisterIdentity.route) }
+            )
+        }
+
         // Login Flow
         composable(Screen.Login.route) {
             LoginScreen(
-                onLoginClick = { navController.navigate(Screen.Home.route) },
+                onLoginClick = { navController.navigate(Screen.OtpVerification.route) },
                 onSignUpClick = { navController.navigate(Screen.RegisterIdentity.route) }
+            )
+        }
+        
+        // OTP
+        composable(Screen.OtpVerification.route) {
+            OtpVerificationScreen(
+                onVerifyClick = { 
+                    // Al verificar, vamos al Home y limpiamos la pila de login
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Welcome.route) { inclusive = true }
+                    }
+                },
+                onCancelClick = { navController.popBackStack() }
             )
         }
         
         // Registration Flow
         composable(Screen.RegisterIdentity.route) {
             RegisterIdentityScreen(
-                onNextClick = { navController.navigate(Screen.RegisterLocation.route) },
+                onNextClick = { navController.navigate(Screen.OtpVerification.route) },
+                onLoginClick = { navController.navigate(Screen.Login.route) },
                 onScanClick = { /* TODO: Implement Scan logic */ },
                 onGalleryClick = { /* TODO: Implement Gallery logic */ }
             )
@@ -46,9 +70,8 @@ fun AppNavHost(
         composable(Screen.RegisterLocation.route) {
             RegisterLocationScreen(
                 onFinishClick = {
-                    // Navega al Home y limpia la pila de navegación para que no pueda volver al registro
                     navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
+                        popUpTo(Screen.Welcome.route) { inclusive = true }
                     }
                 },
                 onUseCurrentLocationClick = { /* TODO: Implement location logic */ }
@@ -67,7 +90,7 @@ fun AppNavHost(
         composable(Screen.Profile.route) {
             ProfileScreen(
                 onLogoutClick = {
-                    navController.navigate(Screen.Login.route) {
+                    navController.navigate(Screen.Welcome.route) {
                         popUpTo(0) { inclusive = true }
                     }
                 },

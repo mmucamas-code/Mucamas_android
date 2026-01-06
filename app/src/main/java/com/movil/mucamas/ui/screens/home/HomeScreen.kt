@@ -39,13 +39,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.movil.mucamas.ui.theme.OrangeAccent
-import com.movil.mucamas.ui.theme.TurquoiseMain
 
 data class ServiceItem(
     val name: String,
     val icon: ImageVector,
-    val color: Color
+    val color: Color? = null // Hacemos el color opcional para usar el tema si es null
 )
 
 @Composable
@@ -55,9 +53,9 @@ fun HomeScreen(
     onProfileClick: () -> Unit = {}
 ) {
     val services = listOf(
-        ServiceItem("Limpieza", Icons.Default.Home, TurquoiseMain),
-        ServiceItem("Cocina", Icons.Default.Star, OrangeAccent),
-        ServiceItem("Planchado", Icons.Default.DateRange, Color(0xFF6C63FF)) // Color ejemplo violeta
+        ServiceItem("Limpieza", Icons.Default.Home, null), // Usará primary color
+        ServiceItem("Cocina", Icons.Default.Star, null), // Usará secondary color
+        ServiceItem("Planchado", Icons.Default.DateRange, Color(0xFF6C63FF))
     )
 
     Scaffold(
@@ -73,21 +71,24 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = 24.dp), // Padding generoso
             verticalArrangement = Arrangement.Top
         ) {
             item {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(32.dp)) // Más espacio arriba
                 HeaderSection()
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(40.dp)) // Más espacio antes de las cards
             }
 
             items(services) { service ->
+                // Determinar el color: si es null, usar primary/secondary del tema
+                val itemColor = service.color ?: if (service.name == "Limpieza") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+
                 ServiceCard(
-                    serviceItem = service,
+                    serviceItem = service.copy(color = itemColor),
                     onClick = { onServiceClick(service.name) }
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(20.dp)) // Más espacio entre cards
             }
         }
     }
@@ -99,11 +100,12 @@ fun HeaderSection() {
         Text(
             text = "Hola, Usuario",
             style = MaterialTheme.typography.titleLarge,
-            color = Color.Gray
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
         )
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "¿Qué necesitas hoy?",
-            style = MaterialTheme.typography.headlineMedium.copy(
+            style = MaterialTheme.typography.displaySmall.copy( // Texto más grande e impactante
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
             )
@@ -119,33 +121,33 @@ fun ServiceCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(120.dp)
+            .height(140.dp) // Cards más grandes
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(28.dp), // Bordes más redondeados
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp) // Un poco más de elevación
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(32.dp), // Padding interno mayor
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Start
         ) {
             // Icon Container
             Box(
                 modifier = Modifier
-                    .size(64.dp)
-                    .background(serviceItem.color.copy(alpha = 0.1f), CircleShape),
+                    .size(72.dp) // Icon container más grande
+                    .background(serviceItem.color?.copy(alpha = 0.1f) ?: MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = serviceItem.icon,
                     contentDescription = null,
-                    tint = serviceItem.color,
-                    modifier = Modifier.size(32.dp)
+                    tint = serviceItem.color ?: MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(36.dp) // Icono más grande
                 )
             }
 
@@ -153,9 +155,9 @@ fun ServiceCard(
 
             Text(
                 text = serviceItem.name,
-                fontSize = 20.sp,
+                fontSize = 22.sp, // Texto más grande
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -168,31 +170,31 @@ fun BottomNavigationBar(
     onProfileClick: () -> Unit
 ) {
     NavigationBar(
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 8.dp
     ) {
         NavigationBarItem(
             selected = true,
             onClick = onHomeClick,
             icon = { Icon(Icons.Default.Home, contentDescription = "Inicio") },
-            label = { Text("Inicio") },
+            label = { Text("Inicio", fontWeight = FontWeight.SemiBold) },
             colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = TurquoiseMain,
-                selectedTextColor = TurquoiseMain,
-                indicatorColor = TurquoiseMain.copy(alpha = 0.1f)
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
             )
         )
         NavigationBarItem(
             selected = false,
             onClick = onReservationsClick,
             icon = { Icon(Icons.Default.DateRange, contentDescription = "Reservas") },
-            label = { Text("Reservas") }
+            label = { Text("Reservas", fontWeight = FontWeight.SemiBold) }
         )
         NavigationBarItem(
             selected = false,
             onClick = onProfileClick,
             icon = { Icon(Icons.Default.Person, contentDescription = "Perfil") },
-            label = { Text("Perfil") }
+            label = { Text("Perfil", fontWeight = FontWeight.SemiBold) }
         )
     }
 }

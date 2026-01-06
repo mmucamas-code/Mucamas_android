@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -28,6 +27,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -38,14 +38,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.movil.mucamas.ui.theme.OrangeAccent
-import com.movil.mucamas.ui.theme.TurquoiseMain
 
 @Composable
 fun SelectDateScreen(
     onContinueClick: () -> Unit = {}
 ) {
-    var selectedDate by remember { mutableStateOf(15) } // Default selected day
+    var selectedDate by remember { mutableIntStateOf(15) } // Default selected day
     var selectedTime by remember { mutableStateOf("10:00 AM") }
 
     Scaffold(
@@ -56,7 +54,7 @@ fun SelectDateScreen(
                     .fillMaxWidth()
                     .padding(16.dp)
                     .height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = OrangeAccent),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                 shape = RoundedCornerShape(28.dp)
             ) {
                 Text(
@@ -73,7 +71,7 @@ fun SelectDateScreen(
                 .padding(innerPadding)
                 .padding(horizontal = 24.dp)
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
             
             Text(
                 text = "Agenda tu servicio",
@@ -83,43 +81,46 @@ fun SelectDateScreen(
                 )
             )
             
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(40.dp))
 
             // Calendario Mock
             Text(
                 text = "Noviembre 2023",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             CalendarMock(
                 selectedDay = selectedDate,
                 onDaySelected = { selectedDate = it }
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(40.dp))
 
             // Selector de Horario
             Text(
                 text = "Horario de inicio",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             TimeSelector(
                 selectedTime = selectedTime,
                 onTimeSelected = { selectedTime = it }
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(40.dp))
 
             // Ubicación Preview
             Text(
                 text = "Ubicación del servicio",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             LocationPreviewCard()
         }
     }
@@ -133,25 +134,26 @@ fun CalendarMock(
     val days = (1..30).toList()
     LazyVerticalGrid(
         columns = GridCells.Fixed(7),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.height(240.dp) // Altura fija para el ejemplo
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.height(280.dp) // Altura fija mayor
     ) {
         items(days.size) { index ->
             val day = days[index]
             val isSelected = day == selectedDay
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(48.dp) // Días más grandes
                     .clip(CircleShape)
-                    .background(if (isSelected) TurquoiseMain else Color.Transparent)
+                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
                     .clickable { onDaySelected(day) },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = day.toString(),
-                    color = if (isSelected) Color.White else Color.Black,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                    fontSize = 16.sp
                 )
             }
         }
@@ -172,16 +174,16 @@ fun TimeSelector(
             val isSelected = time == selectedTime
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (isSelected) TurquoiseMain else Color(0xFFF0F0F0))
+                    .clip(RoundedCornerShape(16.dp)) // Más redondeado
+                    .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     .clickable { onTimeSelected(time) }
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp) // Chips más grandes
             ) {
                 Text(
                     text = time,
-                    color = if (isSelected) Color.White else Color.Gray,
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Medium,
-                    fontSize = 12.sp
+                    fontSize = 14.sp
                 )
             }
         }
@@ -193,30 +195,32 @@ fun LocationPreviewCard() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFFF8F9FA))
-            .padding(16.dp),
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)) // Fondo sutil
+            .padding(20.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(48.dp)
-                .background(Color(0xFFE0E0E0), RoundedCornerShape(12.dp)),
+                .size(56.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.Place, contentDescription = null, tint = Color.Gray)
+            Icon(Icons.Default.Place, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(20.dp))
         Column {
             Text(
                 text = "Casa Principal",
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.onSurface
             )
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "Av. Principal 123, Ciudad",
-                color = Color.Gray,
-                fontSize = 14.sp
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 16.sp
             )
         }
     }
