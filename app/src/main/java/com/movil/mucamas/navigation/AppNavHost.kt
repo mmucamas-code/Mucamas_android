@@ -23,7 +23,12 @@ fun AppNavHost(
         startDestination = Screen.Login.route,
         modifier = modifier
     ) {
-        composable(Screen.Login.route) { LoginScreen() }
+        composable(Screen.Login.route) {
+            LoginScreen(
+                onLoginClick = { navController.navigate(Screen.Home.route) },
+                onSignUpClick = { /* TODO: Implement navigation to sign up */ }
+            )
+        }
         composable(Screen.Home.route) { HomeScreen() }
         composable(Screen.SelectService.route) { SelectServiceScreen() }
         composable(Screen.SelectDate.route) { SelectDateScreen() }
