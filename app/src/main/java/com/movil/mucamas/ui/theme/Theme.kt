@@ -12,34 +12,48 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
+// Esquema Claro - Elegante y aireado
 private val LightColorScheme = lightColorScheme(
-    primary = TurquoiseMain,
-    onPrimary = Color.White,
-    secondary = OrangeAccent,
-    onSecondary = Color.White,
-    background = BackgroundLight,
-    onBackground = TextDark,
-    surface = Color.White,
-    onSurface = TextDark,
-    tertiary = OrangeAccent
+    primary = SoftBlack,
+    onPrimary = PureWhite,
+    secondary = DarkGray,
+    onSecondary = PureWhite,
+    tertiary = MidGray,
+    onTertiary = SoftBlack,
+    background = LightGray,
+    onBackground = SoftBlack,
+    surface = PureWhite,
+    onSurface = SoftBlack,
+    surfaceVariant = LightGray,
+    onSurfaceVariant = DarkGray,
+    outline = MidGray,
+    error = Color(0xFFD32F2F), // Mantenemos el error en rojo estándar por usabilidad
+    onError = PureWhite
 )
 
+// Esquema Oscuro - Sofisticado y descansado
 private val DarkColorScheme = darkColorScheme(
-    primary = TurquoiseMain,
-    onPrimary = Color.White,
-    secondary = OrangeAccent,
-    onSecondary = Color.White,
-    background = Color(0xFF121212),
-    onBackground = Color.White,
-    surface = Color(0xFF1E1E1E),
-    onSurface = Color.White,
-    tertiary = OrangeAccent
+    primary = PureWhite,
+    onPrimary = SoftBlack,
+    secondary = MidGray,
+    onSecondary = SoftBlack,
+    tertiary = DarkGray,
+    onTertiary = PureWhite,
+    background = PureBlack,
+    onBackground = PureWhite,
+    surface = SoftBlack,
+    onSurface = PureWhite,
+    surfaceVariant = DarkGray,
+    onSurfaceVariant = LightGray,
+    outline = MidGray,
+    error = Color(0xFFEF5350),
+    onError = PureBlack
 )
 
 @Composable
 fun MucamasTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Desactivamos dynamicColor por defecto para mantener la identidad de marca
+    // Desactivamos dynamicColor para mantener estrictamente nuestra identidad visual
     dynamicColor: Boolean = false, 
     content: @Composable () -> Unit
 ) {

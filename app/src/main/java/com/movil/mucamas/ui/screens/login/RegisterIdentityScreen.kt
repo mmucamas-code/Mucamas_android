@@ -37,42 +37,43 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.movil.mucamas.ui.utils.AdaptiveTheme
 
 @Composable
 fun RegisterIdentityScreen(
     onNextClick: () -> Unit = {},
-    onScanClick: () -> Unit = {},
-    onGalleryClick: () -> Unit = {},
-    onLoginClick: () -> Unit = {}
+    onLoginClick: () -> Unit = {},
 ) {
     var identification by remember { mutableStateOf("") }
     var fullName by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
 
+    // Acceso a utilidades adaptativas
+    val spacing = AdaptiveTheme.spacing
+    val dimens = AdaptiveTheme.dimens
+    val typography = AdaptiveTheme.typography
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF0F4F8)), // Fondo muy suave
+            .background(MaterialTheme.colorScheme.background), // Fondo desde el tema
         contentAlignment = Alignment.Center
     ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
-            shape = RoundedCornerShape(32.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                .padding(spacing.large),
+            shape = RoundedCornerShape(dimens.cornerRadius),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
             Column(
-                modifier = Modifier
-                    .padding(32.dp),
+                modifier = Modifier.padding(spacing.extraLarge),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -81,25 +82,26 @@ fun RegisterIdentityScreen(
                     text = "Create Account",
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary, // Color primario (SoftBlack)
+                        fontSize = typography.headline
                     ),
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(spacing.small))
 
                 // Texto descriptivo
                 Text(
                     text = "Create an account so you can explore all the existing jobs",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.Gray,
-                        fontSize = 14.sp
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, // Texto secundario
+                        fontSize = typography.body
                     ),
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(spacing.extraLarge))
 
                 // Inputs
                 RegisterInput(
@@ -109,7 +111,7 @@ fun RegisterIdentityScreen(
                     icon = Icons.Default.AccountCircle,
                     keyboardType = KeyboardType.Number
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(spacing.medium))
                 
                 RegisterInput(
                     value = fullName,
@@ -118,7 +120,7 @@ fun RegisterIdentityScreen(
                     icon = Icons.Default.Person,
                     keyboardType = KeyboardType.Text
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(spacing.medium))
                 
                 RegisterInput(
                     value = phone,
@@ -128,29 +130,29 @@ fun RegisterIdentityScreen(
                     keyboardType = KeyboardType.Phone
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(spacing.large))
 
                 // Botón Sign Up
                 Button(
                     onClick = onNextClick,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(dimens.buttonHeight),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = Color.White
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     ),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                    shape = RoundedCornerShape(dimens.cornerRadius),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
                 ) {
                     Text(
                         text = "Sign up",
-                        fontSize = 18.sp,
+                        fontSize = typography.button,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(spacing.medium))
 
                 // Already have an account
                 TextButton(
@@ -161,42 +163,6 @@ fun RegisterIdentityScreen(
                         style = MaterialTheme.typography.bodyLarge.copy(
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
-                        )
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Separador
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color.LightGray.copy(alpha = 0.4f))
-                    Text(
-                        text = "Or continue with",
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.Gray
-                    )
-                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color.LightGray.copy(alpha = 0.4f))
-                }
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // Google Button (Visual Mock)
-                Box(
-                    modifier = Modifier
-                        .size(60.dp)
-                        .background(Color(0xFFF5F5F5), RoundedCornerShape(16.dp))
-                        .clickable { /* Google Login Mock */ },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "G",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFEA4335) // Google Red
                         )
                     )
                 }
@@ -213,21 +179,23 @@ fun RegisterInput(
     icon: ImageVector,
     keyboardType: KeyboardType = KeyboardType.Text
 ) {
+    val dimens = AdaptiveTheme.dimens
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(dimens.cornerRadius),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = Color.LightGray.copy(alpha = 0.5f),
-            focusedLabelColor = MaterialTheme.colorScheme.primary
+            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+            focusedLabelColor = MaterialTheme.colorScheme.primary,
+            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
         ),
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         trailingIcon = {
-            Icon(icon, contentDescription = null, tint = Color.Gray)
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     )
 }

@@ -62,8 +62,8 @@ fun AppNavHost(
             RegisterIdentityScreen(
                 onNextClick = { navController.navigate(Screen.OtpVerification.route) },
                 onLoginClick = { navController.navigate(Screen.Login.route) },
-                onScanClick = { /* TODO: Implement Scan logic */ },
-                onGalleryClick = { /* TODO: Implement Gallery logic */ }
+                //onScanClick = { /* TODO: Implement Scan logic */ },
+                //onGalleryClick = { /* TODO: Implement Gallery logic */ }
             )
         }
         
