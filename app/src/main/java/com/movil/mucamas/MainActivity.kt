@@ -7,10 +7,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation.compose.rememberNavController
 import com.movil.mucamas.ui.theme.MucamasTheme
 
 class MainActivity : ComponentActivity() {
@@ -19,11 +18,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MucamasTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    MucamasApp(
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                MucamasApp()
             }
         }
     }
@@ -31,16 +26,11 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MucamasApp(modifier: Modifier = Modifier) {
-    Text(
-        text = "Mucama's",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun MucamasAppPreview() {
-    MucamasTheme {
-        MucamasApp()
+    val navController = rememberNavController()
+    Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
+        AppNavHost(
+            navController = navController,
+            modifier = Modifier.padding(innerPadding)
+        )
     }
 }
