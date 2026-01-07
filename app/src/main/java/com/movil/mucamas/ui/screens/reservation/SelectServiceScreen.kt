@@ -1,7 +1,6 @@
 package com.movil.mucamas.ui.screens.reservation
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,20 +12,32 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,37 +46,28 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.movil.mucamas.ui.theme.OrangeAccent
-import com.movil.mucamas.ui.theme.TurquoiseMain
+import com.movil.mucamas.ui.utils.AdaptiveTheme
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-data class SelectableService(
-    val id: String,
-    val name: String,
-    val description: String,
-    val icon: ImageVector,
-    val color: Color
-)
-
+// Renombramos el archivo conceptualmente a CheckoutScreen, aunque el nombre del archivo se mantiene por ahora.
 @Composable
 fun SelectServiceScreen(
     onContinueClick: () -> Unit = {}
 ) {
-    var selectedServiceId by remember { mutableStateOf<String?>(null) }
+    val spacing = AdaptiveTheme.spacing
+    val dimens = AdaptiveTheme.dimens
+    val typography = AdaptiveTheme.typography
 
-    val mainServices = listOf(
-        SelectableService("cleaning", "Limpieza", "Limpieza profunda de hogar", Icons.Default.Home, TurquoiseMain),
-        SelectableService("cooking", "Cocina", "Preparación de alimentos", Icons.Default.Star, OrangeAccent)
-    )
-
-    val additionalServices = listOf(
-        SelectableService("ironing", "Planchado", "Cuidado de ropa", Icons.Default.Add, Color(0xFF6C63FF)),
-        SelectableService("pets", "Cuidado de mascotas", "Paseo y alimentación", Icons.Default.Add, Color(0xFFFF6B6B))
-    )
+    // Mock states
+    var selectedPaymentMethod by remember { mutableStateOf("Efectivo") }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var selectedDate by remember { mutableStateOf("Viernes, 15 Oct 2025") } // Default Mock Date
 
     Scaffold(
         bottomBar = {
@@ -73,135 +75,269 @@ fun SelectServiceScreen(
                 onClick = onContinueClick,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
-                    .height(56.dp),
+                    .padding(spacing.large)
+                    .height(dimens.buttonHeight),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedServiceId != null) MaterialTheme.colorScheme.secondary else Color.Gray
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
-                enabled = selectedServiceId != null,
-                shape = RoundedCornerShape(28.dp)
+                shape = RoundedCornerShape(dimens.cornerRadius),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
             ) {
                 Text(
-                    text = "Continuar",
-                    fontSize = 18.sp,
+                    text = "Confirmar y pagar",
+                    fontSize = typography.button,
                     fontWeight = FontWeight.Bold
                 )
             }
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = spacing.large),
             verticalArrangement = Arrangement.Top
         ) {
             item {
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(spacing.extraLarge))
                 Text(
-                    text = "Encuentra el servicio perfecto",
+                    text = "Resumen y pago seguro",
                     style = MaterialTheme.typography.headlineMedium.copy(
+                        fontSize = typography.headline,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                 )
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(spacing.large))
             }
 
-            items(mainServices) { service ->
-                SelectableServiceCard(
-                    service = service,
-                    isSelected = selectedServiceId == service.id,
-                    onClick = { selectedServiceId = service.id }
-                )
-                Spacer(modifier = Modifier.height(20.dp))
-            }
-
+            // 1) Card de Resumen
             item {
-                Spacer(modifier = Modifier.height(24.dp))
+                SummaryCard(
+                    serviceName = "Limpieza de Hogar",
+                    date = selectedDate,
+                    time = "3:00 pm",
+                    address = "Calle 123 #45-67",
+                    onDateClick = { showDatePicker = true },
+                    onTimeClick = { /* TODO: Show Time Picker */ }
+                )
+                Spacer(modifier = Modifier.height(spacing.large))
+            }
+
+            // 2) Sección Total a pagar
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        text = "Total a pagar",
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "$35.00",
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                }
+                Spacer(modifier = Modifier.height(spacing.extraLarge))
+            }
+
+            // 3) Método de pago
+            item {
                 Text(
-                    text = "Servicios adicionales",
-                    style = MaterialTheme.typography.titleLarge.copy(
+                    text = "Método de pago",
+                    style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            items(additionalServices) { service ->
-                SelectableServiceCard(
-                    service = service,
-                    isSelected = selectedServiceId == service.id,
-                    onClick = { selectedServiceId = service.id },
-                    isCompact = true
+                Spacer(modifier = Modifier.height(spacing.medium))
+                
+                PaymentOptionRow(
+                    text = "Efectivo",
+                    selected = selectedPaymentMethod == "Efectivo",
+                    onClick = { selectedPaymentMethod = "Efectivo" }
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                PaymentOptionRow(
+                    text = "Tarjeta",
+                    selected = selectedPaymentMethod == "Tarjeta",
+                    onClick = { selectedPaymentMethod = "Tarjeta" }
+                )
+                
+                // Espacio extra para el bottom bar y scroll
+                Spacer(modifier = Modifier.height(80.dp))
             }
+        }
+    }
+
+    if (showDatePicker) {
+        SimpleDatePickerDialog(
+            onDateSelected = { date ->
+                selectedDate = date
+                showDatePicker = false
+            },
+            onDismiss = { showDatePicker = false }
+        )
+    }
+}
+
+@Composable
+fun SummaryCard(
+    serviceName: String,
+    date: String,
+    time: String,
+    address: String,
+    onDateClick: () -> Unit,
+    onTimeClick: () -> Unit
+) {
+    val dimens = AdaptiveTheme.dimens
+    val spacing = AdaptiveTheme.spacing
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(dimens.cornerRadius),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(spacing.large)
+        ) {
+            SummaryRow(icon = Icons.Default.Star, text = "Servicio: $serviceName") // Icono mock para servicio
+            Spacer(modifier = Modifier.height(spacing.medium))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+            Spacer(modifier = Modifier.height(spacing.medium))
             
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
-            }
+            SummaryRow(
+                icon = Icons.Default.DateRange, 
+                text = "Fecha: $date", 
+                isClickable = true, 
+                onClick = onDateClick
+            )
+            Spacer(modifier = Modifier.height(spacing.small))
+            
+            SummaryRow(
+                icon = Icons.Default.Warning, // Icono mock para reloj (usando Warning temporalmente o AccessTime si estuviera disponible)
+                // Usaremos un icono disponible que se parezca o sea genérico
+                text = "Hora: $time", 
+                isClickable = true, 
+                onClick = onTimeClick
+            )
+            
+            Spacer(modifier = Modifier.height(spacing.medium))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+            Spacer(modifier = Modifier.height(spacing.medium))
+
+            SummaryRow(icon = Icons.Default.Place, text = "Dirección: $address")
         }
     }
 }
 
 @Composable
-fun SelectableServiceCard(
-    service: SelectableService,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    isCompact: Boolean = false
+fun SummaryRow(
+    icon: ImageVector,
+    text: String,
+    isClickable: Boolean = false,
+    onClick: () -> Unit = {}
 ) {
-    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
-    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-
-    Box(
+    val spacing = AdaptiveTheme.spacing
+    
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(if (isCompact) 90.dp else 160.dp) // Cards más grandes
-            .clip(RoundedCornerShape(28.dp)) // Más redondeado
-            .background(backgroundColor)
-            .border(2.dp, borderColor, RoundedCornerShape(28.dp))
-            .clickable(onClick = onClick)
-            .padding(24.dp), // Más padding interno
-        contentAlignment = Alignment.CenterStart
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = isClickable, onClick = onClick)
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(if (isCompact) 56.dp else 72.dp) // Icono container más grande
-                    .background(service.color.copy(alpha = 0.15f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = service.icon,
-                    contentDescription = null,
-                    tint = service.color,
-                    modifier = Modifier.size(if (isCompact) 28.dp else 36.dp) // Icono más grande
-                )
-            }
-            
-            Spacer(modifier = Modifier.size(20.dp))
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(spacing.medium))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (isClickable) FontWeight.SemiBold else FontWeight.Normal
+            )
+        )
+    }
+}
 
-            Column {
-                Text(
-                    text = service.name,
-                    fontSize = if (isCompact) 18.sp else 22.sp, // Texto más grande
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                if (!isCompact) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = service.description,
-                        style = MaterialTheme.typography.bodyLarge, // Texto descriptivo más grande
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+@Composable
+fun PaymentOptionRow(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val spacing = AdaptiveTheme.spacing
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = onClick,
+            colors = RadioButtonDefaults.colors(
+                selectedColor = MaterialTheme.colorScheme.primary,
+                unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        )
+        Spacer(modifier = Modifier.width(spacing.small))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SimpleDatePickerDialog(
+    onDateSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val datePickerState = rememberDatePickerState()
+
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val selectedMillis = datePickerState.selectedDateMillis
+                    if (selectedMillis != null) {
+                        val formatter = SimpleDateFormat("EEEE, d MMM yyyy", Locale.getDefault())
+                        onDateSelected(formatter.format(Date(selectedMillis)))
+                    }
+                    onDismiss()
                 }
+            ) {
+                Text("OK", color = MaterialTheme.colorScheme.primary)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+    ) {
+        DatePicker(state = datePickerState)
     }
 }
