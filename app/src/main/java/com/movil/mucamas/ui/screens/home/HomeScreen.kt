@@ -18,20 +18,32 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.movil.mucamas.ui.utils.AdaptiveTheme
@@ -39,9 +51,11 @@ import com.movil.mucamas.ui.utils.AdaptiveTheme
 data class ServiceItem(
     val name: String,
     val icon: ImageVector,
-    val color: Color? = null
+    val description: String,
+    val price: String
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onServiceClick: (String) -> Unit = {},
@@ -50,13 +64,30 @@ fun HomeScreen(
 ) {
     // Utilidades adaptativas
     val spacing = AdaptiveTheme.spacing
-    val dimens = AdaptiveTheme.dimens
-    val typography = AdaptiveTheme.typography
+    
+    // Estado para el BottomSheet de detalle
+    var selectedService by remember { mutableStateOf<ServiceItem?>(null) }
+    val sheetState = rememberModalBottomSheetState()
 
     val services = listOf(
-        ServiceItem("Limpieza", Icons.Default.Home, null), 
-        ServiceItem("Cocina", Icons.Default.Star, null), 
-        ServiceItem("Planchado", Icons.Default.DateRange, null)
+        ServiceItem(
+            name = "Limpieza",
+            icon = Icons.Default.Home,
+            description = "Servicio completo de limpieza y desinfección para tu hogar. Incluye barrido, trapeado y limpieza de polvo.",
+            price = "$35.00 / 4h"
+        ),
+        ServiceItem(
+            name = "Cocina",
+            icon = Icons.Default.Star,
+            description = "Preparación de alimentos saludables y deliciosos. Nuestro personal se encarga de cocinar y limpiar la cocina.",
+            price = "$45.00 / día"
+        ),
+        ServiceItem(
+            name = "Planchado",
+            icon = Icons.Default.DateRange,
+            description = "Cuidado experto para tu ropa. Planchado, doblado y organización en tu armario.",
+            price = "$25.00 / canasta"
+        )
     )
 
     LazyColumn(
@@ -72,12 +103,9 @@ fun HomeScreen(
         }
 
         items(services) { service ->
-            // Usar colores del tema
-            val itemColor = service.color ?: MaterialTheme.colorScheme.primary
-
-            ServiceCard(
-                serviceItem = service.copy(color = itemColor),
-                onClick = { onServiceClick(service.name) }
+            ServiceListCard(
+                serviceItem = service,
+                onClick = { selectedService = service }
             )
             Spacer(modifier = Modifier.height(spacing.medium))
         }
@@ -85,6 +113,24 @@ fun HomeScreen(
         // Espacio extra para el BottomBar flotante
         item {
             Spacer(modifier = Modifier.height(80.dp))
+        }
+    }
+
+    // Modal de Detalle
+    if (selectedService != null) {
+        ModalBottomSheet(
+            onDismissRequest = { selectedService = null },
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            ServiceDetailContent(
+                service = selectedService!!,
+                onReserveClick = {
+                    // Aquí iría la lógica de navegación a la reserva en el futuro
+                    onServiceClick(selectedService!!.name)
+                    selectedService = null
+                }
+            )
         }
     }
 }
@@ -115,7 +161,7 @@ fun HeaderSection() {
 }
 
 @Composable
-fun ServiceCard(
+fun ServiceListCard(
     serviceItem: ServiceItem,
     onClick: () -> Unit
 ) {
@@ -126,7 +172,6 @@ fun ServiceCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(140.dp) // Mantener tamaño grande para impacto
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(dimens.cornerRadius),
         colors = CardDefaults.cardColors(
@@ -137,37 +182,144 @@ fun ServiceCard(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(spacing.large),
+                .padding(spacing.medium),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Icon Container
-            Box(
-                modifier = Modifier
-                    .size(dimens.iconLarge * 1.5f)
-                    .background(
-                        serviceItem.color?.copy(alpha = 0.1f) ?: MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), 
-                        CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = serviceItem.icon,
-                    contentDescription = null,
-                    tint = serviceItem.color ?: MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(dimens.iconMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Icon Container
+                Box(
+                    modifier = Modifier
+                        .size(dimens.iconLarge)
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), 
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = serviceItem.icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(dimens.iconSmall)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(spacing.medium))
+
+                Text(
+                    text = serviceItem.name,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontSize = typography.title,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 )
             }
+            
+            // Flecha indicadora sutil
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.width(spacing.large))
+@Composable
+fun ServiceDetailContent(
+    service: ServiceItem,
+    onReserveClick: () -> Unit
+) {
+    val spacing = AdaptiveTheme.spacing
+    val dimens = AdaptiveTheme.dimens
+    val typography = AdaptiveTheme.typography
 
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = spacing.large)
+            .padding(bottom = spacing.extraLarge + 20.dp), // Padding extra para safe area
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Icono Grande Centrado
+        Box(
+            modifier = Modifier
+                .size(80.dp)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = service.icon,
+                contentDescription = null,
+                modifier = Modifier.size(40.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Spacer(modifier = Modifier.height(spacing.medium))
+
+        // Título
+        Text(
+            text = service.name,
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontSize = typography.headline,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            ),
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(spacing.small))
+
+        // Precio
+        Text(
+            text = service.price,
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontSize = typography.title,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            ),
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(spacing.large))
+        
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+        
+        Spacer(modifier = Modifier.height(spacing.large))
+
+        // Descripción
+        Text(
+            text = service.description,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = typography.body,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 24.sp
+            ),
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(spacing.extraLarge))
+
+        // Botón Reservar
+        Button(
+            onClick = onReserveClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(dimens.buttonHeight),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ),
+            shape = RoundedCornerShape(dimens.cornerRadius),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+        ) {
             Text(
-                text = serviceItem.name,
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontSize = typography.title,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                text = "Reservar",
+                fontSize = typography.button,
+                fontWeight = FontWeight.Bold
             )
         }
     }
