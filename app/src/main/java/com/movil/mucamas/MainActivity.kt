@@ -14,6 +14,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.movil.mucamas.navigation.AppNavHost
+import com.movil.mucamas.ui.components.MucamasBottomBar
 import com.movil.mucamas.ui.theme.MucamasTheme
 import com.movil.mucamas.ui.utils.LocalAdaptiveSpecs
 import com.movil.mucamas.ui.utils.rememberAdaptiveSpecs
@@ -28,7 +29,6 @@ class MainActivity : ComponentActivity() {
             val adaptiveSpecs = rememberAdaptiveSpecs(windowSizeClass.widthSizeClass)
 
             MucamasTheme {
-                // Proveemos las specs usando el CompositionLocal importado de utils
                 CompositionLocalProvider(LocalAdaptiveSpecs provides adaptiveSpecs) {
                     MucamasApp()
                 }
@@ -40,7 +40,11 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MucamasApp(modifier: Modifier = Modifier) {
     val navController = rememberNavController()
-    Scaffold(modifier = modifier.fillMaxSize()) { innerPadding ->
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        // Integramos la BottomBar globalmente
+        bottomBar = { MucamasBottomBar(navController = navController) }
+    ) { innerPadding ->
         AppNavHost(
             navController = navController,
             modifier = Modifier.padding(innerPadding)
