@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "242244714554",
+    "project_id": "mucamas",
+    "storage_bucket": "mucamas.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:242244714554:android:f861327b90ff68ffb43503",
+        "android_client_info": {
+          "package_name": "com.movil.mucamas"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqzyMlCcZkuaCakfJ1l3sy4ndP6D4bP-c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
