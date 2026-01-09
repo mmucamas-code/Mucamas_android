@@ -51,7 +51,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.movil.mucamas.ui.models.Service
 import com.movil.mucamas.ui.utils.AdaptiveTheme
+import com.movil.mucamas.ui.utils.formatCurrencyCOP
+import com.movil.mucamas.ui.viewmodels.SelectedServiceViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -59,6 +62,7 @@ import java.util.Locale
 // Renombramos el archivo conceptualmente a CheckoutScreen, aunque el nombre del archivo se mantiene por ahora.
 @Composable
 fun SelectServiceScreen(
+    viewModel: SelectedServiceViewModel = SelectedServiceViewModel(),
     serviceName: String?,
     onContinueClick: () -> Unit = {}
 ) {
@@ -66,16 +70,18 @@ fun SelectServiceScreen(
     val dimens = AdaptiveTheme.dimens
     val typography = AdaptiveTheme.typography
 
+    var service by remember { mutableStateOf<Service?>(null) }
+
     // Mock states
     var selectedPaymentMethod by remember { mutableStateOf("Efectivo") }
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf("Viernes, 15 Oct 2025") } // Default Mock Date
 
     LaunchedEffect(serviceName) {
-        //serviceId?.let { viewModel.loadService(it) }
+        if (serviceName != null){
+            service = viewModel.getServiceByName(serviceName)
+        }
     }
-
-    //val service = viewModel.service
 
     Scaffold(
         bottomBar = {
@@ -124,7 +130,7 @@ fun SelectServiceScreen(
             // 1) Card de Resumen
             item {
                 SummaryCard(
-                    serviceName = "Limpieza de Hogar",
+                    serviceName = service?.nombre ?: "--",
                     date = selectedDate,
                     time = "3:00 pm",
                     address = "Calle 123 #45-67",
@@ -148,7 +154,7 @@ fun SelectServiceScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "$35.00",
+                        text = formatCurrencyCOP(service?.precio ?: 0),
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary

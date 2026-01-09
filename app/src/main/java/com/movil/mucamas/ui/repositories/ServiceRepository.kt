@@ -6,6 +6,7 @@ import com.google.firebase.firestore.ktx.toObjects
 import com.movil.mucamas.ui.models.Service
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.tasks.await
 
 class ServiceRepository {
 
@@ -23,5 +24,15 @@ class ServiceRepository {
                 // Convierte la lista de documentos al data class Service
                 snapshot.toObjects<Service>()
             }
+    }
+
+    suspend fun getServiceByNameOnce(name: String): Service? {
+        val snapshot = firestore.collection("services")
+            .whereEqualTo("nombre", name)
+            .limit(1)
+            .get()
+            .await()
+
+        return snapshot.documents.firstOrNull()?.toObject(Service::class.java)
     }
 }
