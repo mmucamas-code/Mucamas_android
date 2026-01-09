@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,6 +59,7 @@ import java.util.Locale
 // Renombramos el archivo conceptualmente a CheckoutScreen, aunque el nombre del archivo se mantiene por ahora.
 @Composable
 fun SelectServiceScreen(
+    serviceName: String?,
     onContinueClick: () -> Unit = {}
 ) {
     val spacing = AdaptiveTheme.spacing
@@ -68,6 +70,12 @@ fun SelectServiceScreen(
     var selectedPaymentMethod by remember { mutableStateOf("Efectivo") }
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf("Viernes, 15 Oct 2025") } // Default Mock Date
+
+    LaunchedEffect(serviceName) {
+        //serviceId?.let { viewModel.loadService(it) }
+    }
+
+    //val service = viewModel.service
 
     Scaffold(
         bottomBar = {

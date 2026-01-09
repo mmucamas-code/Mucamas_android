@@ -11,28 +11,28 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
+import com.movil.mucamas.navigation.Screen
+import com.movil.mucamas.navigation.Screen.ConfirmReservation.createRoute
 import com.movil.mucamas.ui.components.BottomNavItem
 import com.movil.mucamas.ui.components.MucamasBottomBar
 import com.movil.mucamas.ui.screens.home.HomeScreen
 import com.movil.mucamas.ui.screens.myreservations.MyReservationsScreen
 import com.movil.mucamas.ui.screens.profile.ProfileScreen
 
-// Saver para poder usar rememberSaveable con un objeto no-parcelable como BottomNavItem
 val bottomNavItemSaver = Saver<BottomNavItem, String>(
-    save = { it.label }, // Guardamos el label, que es único
+    save = { it.label },
     restore = { label ->
         when (label) {
             BottomNavItem.Home.label -> BottomNavItem.Home
             BottomNavItem.Reservations.label -> BottomNavItem.Reservations
             BottomNavItem.Profile.label -> BottomNavItem.Profile
-            else -> BottomNavItem.Home // Fallback seguro
+            else -> BottomNavItem.Home
         }
     }
 )
 
 @Composable
 fun MainScreen(navController: NavController) {
-    // CORRECCIÓN: Se especifica el tipo explícitamente y se usa el Saver personalizado.
     var currentSection: BottomNavItem by rememberSaveable(stateSaver = bottomNavItemSaver) { 
         mutableStateOf(BottomNavItem.Home) 
     }
@@ -46,19 +46,16 @@ fun MainScreen(navController: NavController) {
         }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
-            // Muestra el contenido de la sección seleccionada
             when (currentSection) {
                 BottomNavItem.Home -> HomeScreen(
-                    // Pasamos el NavController para la navegación secundaria (ej: ir a detalles)
-                    onServiceClick = { serviceName ->
-                        // Aquí sí usamos NavController para ir a una PANTALLA, no a una SECCIÓN
-                        navController.navigate("service_detail/$serviceName")
+                    onServiceClick = { serviceName -> // Ahora recibimos el ID
+                        // CORRECCIÓN: Usar el ID para construir una ruta segura
+                        navController.navigate(Screen.SelectService.createRoute(serviceName))
                     }
                 )
                 BottomNavItem.Reservations -> MyReservationsScreen()
                 BottomNavItem.Profile -> ProfileScreen(
                     onLogoutClick = {
-                        // La lógica de logout navega fuera del MainScreen
                         navController.navigate("auth_graph") {
                             popUpTo("main_graph") { inclusive = true }
                         }

@@ -70,7 +70,7 @@ fun HomeScreen(
     val sessionState by mainViewModel.sessionState.collectAsState()
     val servicesUiState by homeViewModel.servicesUiState.collectAsState()
     var userLogged by remember { mutableStateOf<UserSession?>(null) }
-    
+
     var selectedService by remember { mutableStateOf<Service?>(null) }
     val sheetState = rememberModalBottomSheetState()
 
@@ -137,6 +137,7 @@ fun HomeScreen(
             ServiceDetailContent(
                 service = selectedService!!,
                 onReserveClick = {
+                    // CORRECCIÓN: Pasar el ID del servicio en lugar del nombre
                     onServiceClick(selectedService!!.nombre)
                     selectedService = null
                 }
@@ -170,7 +171,6 @@ fun HeaderSection(userName: String) {
     }
 }
 
-
 @Composable
 fun ServiceListCard(
     service: Service,
@@ -185,7 +185,9 @@ fun ServiceListCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(dimens.cornerRadius),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(

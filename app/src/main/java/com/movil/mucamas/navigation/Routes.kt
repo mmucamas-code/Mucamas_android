@@ -7,10 +7,14 @@ sealed class Screen(val route: String) {
     data object OtpVerification : Screen("otp_verification")
     data object RegisterLocation : Screen("register_location")
     data object Home : Screen("home")
-    data object SelectService : Screen("select_service")
+    data object SelectService : Screen("select_service/{serviceName}")
     data object SelectDate : Screen("select_date")
     data object ConfirmReservation : Screen("confirm_reservation")
     data object MyReservations : Screen("my_reservations")
     data object RateService : Screen("rate_service")
     data object Profile : Screen("profile")
+
+    fun Screen.SelectService.createRoute(serviceName: String): String {
+        return "select_service/$serviceName"
+    }
 }
