@@ -5,45 +5,41 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.movil.mucamas.ui.screens.MainScreen
 import com.movil.mucamas.ui.screens.SplashScreen
 import com.movil.mucamas.ui.screens.WelcomeScreen
-import com.movil.mucamas.ui.screens.home.HomeScreen
 import com.movil.mucamas.ui.screens.login.LoginScreen
 import com.movil.mucamas.ui.screens.login.RegisterIdentityScreen
-import com.movil.mucamas.ui.screens.myreservations.MyReservationsScreen
-import com.movil.mucamas.ui.screens.profile.ProfileScreen
-import com.movil.mucamas.ui.screens.reservation.SelectServiceScreen
 
-// Rutas principales del grafo de autenticación y de la app
 const val AUTH_ROUTE = "auth_graph"
 const val MAIN_ROUTE = "main_graph"
 
 @Composable
 fun AppNavHost(
     navController: NavHostController,
+    startDestination: String,
     modifier: Modifier = Modifier
 ) {
     NavHost(
         navController = navController,
-        startDestination = "splash_screen", // Nuevo punto de inicio
+        startDestination = startDestination,
         modifier = modifier
     ) {
-        // SplashScreen para decidir el flujo inicial
         composable("splash_screen") {
             SplashScreen(
-                onNavigateToHome = {
-                    navController.navigate(MAIN_ROUTE) {
+                onNavigateToHome = { 
+                    navController.navigate(MAIN_ROUTE) { 
                         popUpTo("splash_screen") { inclusive = true }
                     }
                 },
-                onNavigateToAuth = {
-                    navController.navigate(AUTH_ROUTE) {
+                onNavigateToAuth = { 
+                    navController.navigate(AUTH_ROUTE) { 
                         popUpTo("splash_screen") { inclusive = true }
                     }
                 }
             )
         }
-
+        
         // Grafo de Autenticación
         composable(route = AUTH_ROUTE) {
             WelcomeScreen(
@@ -51,7 +47,7 @@ fun AppNavHost(
                 onRegisterClick = { navController.navigate(Screen.RegisterIdentity.route) }
             )
         }
-        
+
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
@@ -74,39 +70,12 @@ fun AppNavHost(
             )
         }
 
-        // Grafo Principal (Home y resto de la app)
+        // Grafo Principal: una única pantalla que gestiona las secciones
         composable(route = MAIN_ROUTE) {
-             // Aquí podrías tener otro NavHost si el grafo principal es complejo,
-             // o simplemente lanzar la pantalla Home como punto de entrada.
-             HomeScreen(
-                onServiceClick = { serviceName ->
-                    // Navegar a la pantalla de detalle/reserva con el nombre del servicio
-                    navController.navigate("${Screen.SelectService.route}/$serviceName")
-                }
-             )
+            MainScreen(navController = navController)
         }
 
-        // Pantallas internas del grafo principal
-        composable("${Screen.SelectService.route}/{serviceName}") { backStackEntry ->
-            val serviceName = backStackEntry.arguments?.getString("serviceName") ?: ""
-            SelectServiceScreen(onContinueClick = { 
-                // Lógica de navegación después de la reserva
-                navController.navigate(Screen.MyReservations.route)
-            })
-        }
-
-        composable(Screen.MyReservations.route) {
-            MyReservationsScreen()
-        }
-
-        composable(Screen.Profile.route) {
-            ProfileScreen(
-                onLogoutClick = {
-                    navController.navigate(AUTH_ROUTE) {
-                        popUpTo(MAIN_ROUTE) { inclusive = true }
-                    }
-                }
-            )
-        }
+        // Aquí irían las pantallas que se abren POR ENCIMA del MainScreen
+        // Ejemplo: composable("service_detail/{serviceId}") { ... }
     }
 }

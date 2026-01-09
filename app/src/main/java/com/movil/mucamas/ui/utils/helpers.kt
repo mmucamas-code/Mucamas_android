@@ -215,10 +215,10 @@ fun getSampleServices() : List<Service> {
     return servicesSeed
 }
 
-/*
-fun getServiceIcon(iconName: String): ImageVector {
-    return when (iconName.lowercase()) {
 
+fun getServiceIcon(iconName: String): ImageVector {
+    return Icons.Default.Star
+    /*return when (iconName.lowercase()) {
         // Limpieza
         "cleaning" -> Icons.Default.CleaningServices
         "deep_clean" -> Icons.Default.
@@ -271,6 +271,5 @@ fun getServiceIcon(iconName: String): ImageVector {
 
         // Fallback seguro
         else -> Icons.Default.Home
-    }
+    }*/
 }
- */
