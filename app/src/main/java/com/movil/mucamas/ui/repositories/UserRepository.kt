@@ -24,4 +24,31 @@ class UserRepository {
             Result.failure(e)
         }
     }
+
+    /**
+     * Busca un usuario por su número de identificación (idNumber).
+     * Retorna Result.success con el UserDto si lo encuentra.
+     * Retorna Result.success con null si no existe.
+     * Retorna Result.failure si ocurre un error.
+     */
+    suspend fun findUserByIdNumber(idNumber: String): Result<UserDto?> {
+        return try {
+            val querySnapshot = collection
+                .whereEqualTo("idNumber", idNumber)
+                .limit(1)
+                .get()
+                .await()
+            
+            if (querySnapshot.isEmpty) {
+                Result.success(null) // Usuario no encontrado
+            } else {
+                // Lo encontramos, lo convertimos al DTO y lo retornamos
+                val user = querySnapshot.documents.first().toObject(UserDto::class.java)
+                Result.success(user)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
 }
