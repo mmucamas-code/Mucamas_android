@@ -1,8 +1,12 @@
 package com.movil.mucamas.ui.viewmodels
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.movil.mucamas.data.SessionManager
+import com.movil.mucamas.data.model.UserSession
+import com.movil.mucamas.ui.models.UserDto
 import com.movil.mucamas.ui.repositories.UserRepository
 import com.movil.mucamas.ui.utils.OtpManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +29,7 @@ class LoginViewModel(
     private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
+    private var savedUser: UserDto? = null
     private var generatedOtp: String? = null
 
     fun findUserById(idNumber: String, context: Context) {
@@ -39,6 +44,7 @@ class LoginViewModel(
                     // Usuario encontrado: generar y notificar OTP
                     val otp = OtpManager.generateAndNotifyOtp(context)
                     generatedOtp = otp
+                    savedUser = user
                     _uiState.value = LoginUiState.UserFound(otp)
                 } else {
                     // Usuario no encontrado
@@ -56,8 +62,21 @@ class LoginViewModel(
     /**
      * Verifica si el código ingresado coincide con el generado.
      */
-    fun verifyOtp(enteredOtp: String): Boolean {
-        return enteredOtp == generatedOtp
+    fun verifyOtpAndLogin(enteredOtp: String, context: Context): Boolean {
+        if (enteredOtp == generatedOtp) {
+            viewModelScope.launch {
+                savedUser?.let {
+                    // Aquí necesitaríamos el documentId, que no tenemos.
+                    // Lo ideal sería volver a buscar al usuario para obtenerlo.
+                    // Por simplicidad del flujo, usaremos el idNumber como userId temporal
+                    val session = UserSession(userId = it.idNumber, fullName = it.fullName, idNumber = it.idNumber, role = it.role)
+                    Log.i("session", "SessionState save from login: ${session.toString()}")
+                    SessionManager(context).saveUserSession(session)
+                }
+            }
+            return true
+        }
+        return false
     }
 
     /**
@@ -66,5 +85,6 @@ class LoginViewModel(
     fun resetState() {
         _uiState.value = LoginUiState.Idle
         generatedOtp = null
+        savedUser = null
     }
 }

@@ -63,6 +63,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.movil.mucamas.ui.utils.AdaptiveTheme
 import com.movil.mucamas.ui.viewmodels.LoginUiState
 import com.movil.mucamas.ui.viewmodels.LoginViewModel
+import com.movil.mucamas.ui.viewmodels.RegistrationUiState
+import com.movil.mucamas.ui.viewmodels.RegisterViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,13 +90,6 @@ fun LoginScreen(
             }
         }
     )
-
-    // Lanzamos efecto cuando cambia el estado para mostrar OTP o errores
-    LaunchedEffect(uiState) {
-        if (uiState is LoginUiState.UserFound) {
-            // El OTP se muestra como alerta, el estado lo controla `showOtpDialog`
-        }
-    }
 
     // Estado local para la visibilidad de los diálogos
     var showOtpDialog by remember { mutableStateOf(false) }
@@ -165,20 +160,16 @@ fun LoginScreen(
                 // Botón "Continuar" que ahora solicita permiso si es necesario
                 Button(
                     onClick = {
-                        // Verificar si el permiso ya está concedido
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             when (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)) {
                                 PackageManager.PERMISSION_GRANTED -> {
-                                    // Permiso ya concedido, buscar usuario
                                     viewModel.findUserById(identification, context)
                                 }
                                 else -> {
-                                    // Solicitar permiso
                                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                 }
                             }
                         } else {
-                            // Versiones anteriores a Android 13 no necesitan permiso
                             viewModel.findUserById(identification, context)
                         }
                     },
@@ -203,12 +194,11 @@ fun LoginScreen(
 
         // --- DIÁLOGOS --- 
 
-        // Diálogo de OTP
         if (showOtpDialog) {
             OtpDialog(
                 onDismissRequest = { viewModel.resetState() },
                 onVerify = { enteredOtp ->
-                    if (viewModel.verifyOtp(enteredOtp)) {
+                    if (viewModel.verifyOtpAndLogin(enteredOtp,context)) {
                         Toast.makeText(context, "Login Exitoso", Toast.LENGTH_SHORT).show()
                         viewModel.resetState()
                         onLoginSuccess()
@@ -219,7 +209,6 @@ fun LoginScreen(
             )
         }
 
-        // Diálogo de Usuario No Encontrado
         if (showErrorDialog) {
             UserNotFoundDialog(
                 onDismiss = { viewModel.resetState() },
@@ -296,7 +285,7 @@ fun OtpDialog(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun UserNotFoundDialog(
+fun UserNotFoundDialog(
     onDismiss: () -> Unit,
     onRegister: () -> Unit
 ) {
@@ -307,7 +296,10 @@ private fun UserNotFoundDialog(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.padding(AdaptiveTheme.spacing.large), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Usuario no encontrado", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
+                Text(
+                    text = "Usuario no encontrado", 
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                )
                 Spacer(modifier = Modifier.height(AdaptiveTheme.spacing.medium))
                 Text("El número de identificación no está registrado. Por favor, crea una cuenta.", style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.height(AdaptiveTheme.spacing.large))

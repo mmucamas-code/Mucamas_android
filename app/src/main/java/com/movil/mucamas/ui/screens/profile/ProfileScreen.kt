@@ -33,13 +33,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.movil.mucamas.data.SessionManager
 import com.movil.mucamas.ui.utils.AdaptiveTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 @Composable
 fun ProfileScreen(
@@ -51,6 +56,8 @@ fun ProfileScreen(
     val spacing = AdaptiveTheme.spacing
     val dimens = AdaptiveTheme.dimens
     val typography = AdaptiveTheme.typography
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -163,7 +170,12 @@ fun ProfileScreen(
 
             // Botón Cerrar Sesión
             Button(
-                onClick = onLogoutClick,
+                onClick = {
+                    scope.launch {
+                        SessionManager(context).clearSession()
+                    }
+                    onLogoutClick()
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),

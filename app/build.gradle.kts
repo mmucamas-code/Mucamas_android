@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    // Aplicar el plugin de Google Services
     alias(libs.plugins.google.services)
 }
 
@@ -53,9 +54,14 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.material3.window.size)
-    implementation(libs.firebase.firestore)
-    implementation(libs.kotlinx.coroutines.play.services)
-    implementation(libs.firebase.bom)
+    implementation(libs.datastore.preferences)
+
+    // Firebase - Añadir el Bill of Materials (BoM)
+    implementation(platform(libs.firebase.bom))
+    // Añadir las dependencias específicas de Firebase que necesitas
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
