@@ -33,31 +33,42 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.movil.mucamas.data.SessionManager
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.movil.mucamas.data.model.SessionResult
+import com.movil.mucamas.data.model.UserSession
 import com.movil.mucamas.ui.utils.AdaptiveTheme
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
+import com.movil.mucamas.ui.viewmodels.MainViewModel
 
 @Composable
 fun ProfileScreen(
     onLogoutClick: () -> Unit = {},
-    onHomeClick: () -> Unit = {},
-    onReservationsClick: () -> Unit = {}
+    mainViewModel: MainViewModel = viewModel()
 ) {
-    // Utilidades adaptativas
     val spacing = AdaptiveTheme.spacing
     val dimens = AdaptiveTheme.dimens
     val typography = AdaptiveTheme.typography
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val sessionState by mainViewModel.sessionState.collectAsState()
+    var userLogged by remember { mutableStateOf<UserSession?>(null) }
+
+    LaunchedEffect(sessionState) {
+        when (val result = sessionState) {
+            is SessionResult.Success -> { userLogged = result.user }
+            is SessionResult.Empty -> { }
+            is SessionResult.Loading -> {}
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -91,7 +102,7 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = "María Pérez",
+                    text = userLogged?.fullName ?: "Nombre de Usuario",
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontSize = typography.headline,
                         fontWeight = FontWeight.Bold,
@@ -110,7 +121,7 @@ fun ProfileScreen(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "4.8 (24 servicios)",
+                        text = "Rol: ${userLogged?.role ?: "-"} | ID: ${userLogged?.idNumber ?: "-"}",
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontSize = typography.body,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -134,19 +145,9 @@ fun ProfileScreen(
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
-            MenuOptionItem(
-                icon = Icons.Default.Home,
-                title = "Mis direcciones",
-                onClick = { /* TODO */ }
-            )
-            
+            MenuOptionItem(icon = Icons.Default.Home, title = "Mis direcciones", onClick = { /* TODO */ })
             Spacer(modifier = Modifier.height(12.dp))
-            
-            MenuOptionItem(
-                icon = Icons.Default.Info,
-                title = "Historial de servicios",
-                onClick = { /* TODO */ }
-            )
+            MenuOptionItem(icon = Icons.Default.Info, title = "Historial de servicios", onClick = { /* TODO */ })
 
             Spacer(modifier = Modifier.height(32.dp))
             
@@ -160,25 +161,14 @@ fun ProfileScreen(
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
-            MenuOptionItem(
-                icon = Icons.Default.Settings,
-                title = "Soporte y Ayuda",
-                onClick = { /* TODO */ }
-            )
+            MenuOptionItem(icon = Icons.Default.Settings, title = "Soporte y Ayuda", onClick = { /* TODO */ })
             
             Spacer(modifier = Modifier.height(40.dp))
 
             // Botón Cerrar Sesión
             Button(
-                onClick = {
-                    scope.launch {
-                        SessionManager(context).clearSession()
-                    }
-                    onLogoutClick()
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
+                onClick = onLogoutClick,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     contentColor = MaterialTheme.colorScheme.error
@@ -199,7 +189,6 @@ fun ProfileScreen(
             }
         }
         
-        // Espacio para la BottomBar flotante
         Spacer(modifier = Modifier.height(80.dp))
     }
 }

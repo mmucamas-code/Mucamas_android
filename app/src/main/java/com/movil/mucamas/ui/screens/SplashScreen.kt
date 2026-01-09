@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.movil.mucamas.data.model.SessionResult
+import com.movil.mucamas.ui.utils.uploadServicesToFirestore
 import com.movil.mucamas.ui.viewmodels.MainViewModel
 import kotlinx.coroutines.delay
 
@@ -24,6 +25,15 @@ fun SplashScreen(
     viewModel: MainViewModel = viewModel()
 ) {
     val sessionState by viewModel.sessionState.collectAsState()
+
+    /*
+    // Sirve para subir los servicios a la base de datos
+    LaunchedEffect(Unit) {
+        uploadServicesToFirestore(
+            onSuccess = { println("Servicios cargados") },
+            onError = { println("Error: ${it.message}") }
+        )
+    }*/
 
     LaunchedEffect(sessionState) {
         when (sessionState) {

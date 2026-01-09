@@ -1,5 +1,6 @@
 package com.movil.mucamas.ui.screens.home
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,7 +49,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.movil.mucamas.data.model.SessionResult
+import com.movil.mucamas.data.model.UserSession
 import com.movil.mucamas.ui.utils.AdaptiveTheme
+import com.movil.mucamas.ui.viewmodels.MainViewModel
 
 data class ServiceItem(
     val name: String,
@@ -59,36 +66,28 @@ data class ServiceItem(
 @Composable
 fun HomeScreen(
     onServiceClick: (String) -> Unit = {},
-    onMyReservationsClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {}
+    mainViewModel: MainViewModel = viewModel()
 ) {
-    // Utilidades adaptativas
     val spacing = AdaptiveTheme.spacing
+    val sessionState by mainViewModel.sessionState.collectAsState()
+    var userLogged by remember { mutableStateOf<UserSession?>(null) }
     
-    // Estado para el BottomSheet de detalle
     var selectedService by remember { mutableStateOf<ServiceItem?>(null) }
     val sheetState = rememberModalBottomSheetState()
 
     val services = listOf(
-        ServiceItem(
-            name = "Limpieza",
-            icon = Icons.Default.Home,
-            description = "Servicio completo de limpieza y desinfección para tu hogar. Incluye barrido, trapeado y limpieza de polvo.",
-            price = "$35.00 / 4h"
-        ),
-        ServiceItem(
-            name = "Cocina",
-            icon = Icons.Default.Star,
-            description = "Preparación de alimentos saludables y deliciosos. Nuestro personal se encarga de cocinar y limpiar la cocina.",
-            price = "$45.00 / día"
-        ),
-        ServiceItem(
-            name = "Planchado",
-            icon = Icons.Default.DateRange,
-            description = "Cuidado experto para tu ropa. Planchado, doblado y organización en tu armario.",
-            price = "$25.00 / canasta"
-        )
+        ServiceItem("Limpieza", Icons.Default.Home, "Servicio completo de limpieza y desinfección.", "$35.00 / 4h"),
+        ServiceItem("Cocina", Icons.Default.Star, "Preparación de alimentos saludables.", "$45.00 / día"),
+        ServiceItem("Planchado", Icons.Default.DateRange, "Cuidado experto para tu ropa.", "$25.00 / canasta")
     )
+
+    LaunchedEffect(sessionState) {
+        when (val result = sessionState) {
+            is SessionResult.Success -> { userLogged = result.user }
+            is SessionResult.Empty -> { }
+            is SessionResult.Loading -> {}
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -98,7 +97,8 @@ fun HomeScreen(
     ) {
         item {
             Spacer(modifier = Modifier.height(spacing.extraLarge))
-            HeaderSection()
+            // Pasamos el primer nombre al Header
+            HeaderSection(userName = userLogged?.fullName?.substringBefore(" ") ?: "Usuario")
             Spacer(modifier = Modifier.height(spacing.extraLarge))
         }
 
@@ -110,13 +110,11 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(spacing.medium))
         }
         
-        // Espacio extra para el BottomBar flotante
         item {
             Spacer(modifier = Modifier.height(80.dp))
         }
     }
 
-    // Modal de Detalle
     if (selectedService != null) {
         ModalBottomSheet(
             onDismissRequest = { selectedService = null },
@@ -126,7 +124,6 @@ fun HomeScreen(
             ServiceDetailContent(
                 service = selectedService!!,
                 onReserveClick = {
-                    // Aquí iría la lógica de navegación a la reserva en el futuro
                     onServiceClick(selectedService!!.name)
                     selectedService = null
                 }
@@ -136,13 +133,13 @@ fun HomeScreen(
 }
 
 @Composable
-fun HeaderSection() {
+fun HeaderSection(userName: String) {
     val typography = AdaptiveTheme.typography
     val spacing = AdaptiveTheme.spacing
 
     Column {
         Text(
-            text = "Hola, Usuario",
+            text = "Hola, $userName!",
             style = MaterialTheme.typography.titleLarge.copy(
                 fontSize = typography.title,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
@@ -159,6 +156,8 @@ fun HeaderSection() {
         )
     }
 }
+
+// El resto de los componentes (ServiceListCard, ServiceDetailContent) se mantienen igual...
 
 @Composable
 fun ServiceListCard(
@@ -192,7 +191,7 @@ fun ServiceListCard(
                     modifier = Modifier
                         .size(dimens.iconLarge)
                         .background(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), 
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
                             CircleShape
                         ),
                     contentAlignment = Alignment.Center
