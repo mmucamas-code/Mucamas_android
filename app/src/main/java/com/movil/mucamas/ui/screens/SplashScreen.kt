@@ -26,6 +26,7 @@ fun SplashScreen(
 ) {
     val sessionState by viewModel.sessionState.collectAsState()
 
+
     /*
     // Sirve para subir los servicios a la base de datos
     LaunchedEffect(Unit) {
@@ -33,7 +34,8 @@ fun SplashScreen(
             onSuccess = { println("Servicios cargados") },
             onError = { println("Error: ${it.message}") }
         )
-    }*/
+    }
+    */
 
     LaunchedEffect(sessionState) {
         when (sessionState) {

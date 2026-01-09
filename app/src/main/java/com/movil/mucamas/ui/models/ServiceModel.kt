@@ -5,5 +5,6 @@ data class Service(
     val icono: String = "",
     val descripcion: String = "",
     val precio: Long = 0,
-    val activo: Boolean = true
+    val activo: Boolean = true,
+    val duracionMinutos: Int = 0
 )

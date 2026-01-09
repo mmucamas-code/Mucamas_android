@@ -54,6 +54,7 @@ import com.movil.mucamas.data.model.UserSession
 import com.movil.mucamas.ui.models.Service
 import com.movil.mucamas.ui.utils.AdaptiveTheme
 import com.movil.mucamas.ui.utils.formatCurrencyCOP
+import com.movil.mucamas.ui.utils.formatDuration
 import com.movil.mucamas.ui.utils.getServiceIcon
 import com.movil.mucamas.ui.viewmodels.HomeViewModel
 import com.movil.mucamas.ui.viewmodels.MainViewModel
@@ -95,7 +96,6 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(spacing.extraLarge))
         }
 
-        // Renderizado condicional basado en el estado
         item {
             when (val state = servicesUiState) {
                 is ServicesUiState.Loading -> {
@@ -115,7 +115,7 @@ fun HomeScreen(
                     }
                 }
                 is ServicesUiState.Empty -> {
-                    Text("No hay servicios disponibles en este momento.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(spacing.extraLarge))
+                    Text("No hay servicios disponibles.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(spacing.extraLarge))
                 }
                 is ServicesUiState.Error -> {
                     Text("Error: ${state.message}", color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(spacing.extraLarge))
@@ -185,9 +185,7 @@ fun ServiceListCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(dimens.cornerRadius),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -270,11 +268,20 @@ fun ServiceDetailContent(
 
         Spacer(modifier = Modifier.height(spacing.small))
 
-        Text(
-            text = formatCurrencyCOP(service.precio), // Usar el precio del modelo
-            style = MaterialTheme.typography.titleLarge.copy(fontSize = typography.title, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary),
-            textAlign = TextAlign.Center
-        )
+        // Unir Precio y Duración
+        Row {
+             Text(
+                text = formatCurrencyCOP(service.precio),
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = typography.title, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.width(spacing.small))
+            Text(
+                text = "(${formatDuration(service.duracionMinutos.toInt())})",
+                style = MaterialTheme.typography.titleMedium.copy(fontSize = typography.title, color = MaterialTheme.colorScheme.onSurfaceVariant),
+                textAlign = TextAlign.Center
+            )
+        }
 
         Spacer(modifier = Modifier.height(spacing.large))
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))

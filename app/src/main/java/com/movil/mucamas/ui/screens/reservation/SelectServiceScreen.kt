@@ -1,9 +1,7 @@
 package com.movil.mucamas.ui.screens.reservation
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,11 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
@@ -40,6 +36,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,16 +47,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.movil.mucamas.ui.models.Service
 import com.movil.mucamas.ui.utils.AdaptiveTheme
 import com.movil.mucamas.ui.utils.formatCurrencyCOP
+import com.movil.mucamas.ui.utils.formatDuration
+import com.movil.mucamas.ui.viewmodels.HomeViewModel
 import com.movil.mucamas.ui.viewmodels.SelectedServiceViewModel
+import com.movil.mucamas.ui.viewmodels.ServicesUiState
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// Renombramos el archivo conceptualmente a CheckoutScreen, aunque el nombre del archivo se mantiene por ahora.
 @Composable
 fun SelectServiceScreen(
     viewModel: SelectedServiceViewModel = SelectedServiceViewModel(),
@@ -140,57 +139,63 @@ fun SelectServiceScreen(
                 Spacer(modifier = Modifier.height(spacing.large))
             }
 
-            // 2) Sección Total a pagar
-            item {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    Text(
-                        text = "Total a pagar",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        Text(
+                            text = "Total a pagar",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         )
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = formatCurrencyCOP(service?.precio ?: 0),
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(
+                                text = formatCurrencyCOP(service?.precio ?: 0),
+                                style = MaterialTheme.typography.headlineSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(spacing.small))
+                            Text(
+                                text = "/ ${formatDuration(service?.duracionMinutos?.toInt() ?: 0)}",
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(spacing.extraLarge))
                 }
-                Spacer(modifier = Modifier.height(spacing.extraLarge))
-            }
 
-            // 3) Método de pago
-            item {
-                Text(
-                    text = "Método de pago",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                item {
+                    Text(
+                        text = "Método de pago",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                     )
-                )
-                Spacer(modifier = Modifier.height(spacing.medium))
-                
-                PaymentOptionRow(
-                    text = "Efectivo",
-                    selected = selectedPaymentMethod == "Efectivo",
-                    onClick = { selectedPaymentMethod = "Efectivo" }
-                )
-                PaymentOptionRow(
-                    text = "Tarjeta",
-                    selected = selectedPaymentMethod == "Tarjeta",
-                    onClick = { selectedPaymentMethod = "Tarjeta" }
-                )
-                
-                // Espacio extra para el bottom bar y scroll
-                Spacer(modifier = Modifier.height(80.dp))
+                    Spacer(modifier = Modifier.height(spacing.medium))
+                    
+                    PaymentOptionRow(
+                        text = "Efectivo",
+                        selected = selectedPaymentMethod == "Efectivo",
+                        onClick = { selectedPaymentMethod = "Efectivo" }
+                    )
+                    PaymentOptionRow(
+                        text = "Tarjeta",
+                        selected = selectedPaymentMethod == "Tarjeta",
+                        onClick = { selectedPaymentMethod = "Tarjeta" }
+                    )
+                    
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
             }
         }
-    }
 
     if (showDatePicker) {
         SimpleDatePickerDialog(
@@ -224,7 +229,7 @@ fun SummaryCard(
         Column(
             modifier = Modifier.padding(spacing.large)
         ) {
-            SummaryRow(icon = Icons.Default.Star, text = "Servicio: $serviceName") // Icono mock para servicio
+            SummaryRow(icon = Icons.Default.Star, text = "Servicio: $serviceName")
             Spacer(modifier = Modifier.height(spacing.medium))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
             Spacer(modifier = Modifier.height(spacing.medium))
@@ -238,8 +243,7 @@ fun SummaryCard(
             Spacer(modifier = Modifier.height(spacing.small))
             
             SummaryRow(
-                icon = Icons.Default.Warning, // Icono mock para reloj (usando Warning temporalmente o AccessTime si estuviera disponible)
-                // Usaremos un icono disponible que se parezca o sea genérico
+                icon = Icons.Default.Warning, 
                 text = "Hora: $time", 
                 isClickable = true, 
                 onClick = onTimeClick
