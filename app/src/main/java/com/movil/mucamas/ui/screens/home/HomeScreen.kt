@@ -1,6 +1,5 @@
 package com.movil.mucamas.ui.screens.home
 
-import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +26,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -43,7 +43,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -52,34 +51,28 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.movil.mucamas.data.model.SessionResult
 import com.movil.mucamas.data.model.UserSession
+import com.movil.mucamas.ui.models.Service
 import com.movil.mucamas.ui.utils.AdaptiveTheme
+import com.movil.mucamas.ui.utils.formatCurrencyCOP
+import com.movil.mucamas.ui.utils.getServiceIcon
+import com.movil.mucamas.ui.viewmodels.HomeViewModel
 import com.movil.mucamas.ui.viewmodels.MainViewModel
-
-data class ServiceItem(
-    val name: String,
-    val icon: ImageVector,
-    val description: String,
-    val price: String
-)
+import com.movil.mucamas.ui.viewmodels.ServicesUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onServiceClick: (String) -> Unit = {},
-    mainViewModel: MainViewModel = viewModel()
+    mainViewModel: MainViewModel = viewModel(),
+    homeViewModel: HomeViewModel = viewModel()
 ) {
     val spacing = AdaptiveTheme.spacing
     val sessionState by mainViewModel.sessionState.collectAsState()
+    val servicesUiState by homeViewModel.servicesUiState.collectAsState()
     var userLogged by remember { mutableStateOf<UserSession?>(null) }
     
-    var selectedService by remember { mutableStateOf<ServiceItem?>(null) }
+    var selectedService by remember { mutableStateOf<Service?>(null) }
     val sheetState = rememberModalBottomSheetState()
-
-    val services = listOf(
-        ServiceItem("Limpieza", Icons.Default.Home, "Servicio completo de limpieza y desinfección.", "$35.00 / 4h"),
-        ServiceItem("Cocina", Icons.Default.Star, "Preparación de alimentos saludables.", "$45.00 / día"),
-        ServiceItem("Planchado", Icons.Default.DateRange, "Cuidado experto para tu ropa.", "$25.00 / canasta")
-    )
 
     LaunchedEffect(sessionState) {
         when (val result = sessionState) {
@@ -102,12 +95,32 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(spacing.extraLarge))
         }
 
-        items(services) { service ->
-            ServiceListCard(
-                serviceItem = service,
-                onClick = { selectedService = service }
-            )
-            Spacer(modifier = Modifier.height(spacing.medium))
+        // Renderizado condicional basado en el estado
+        item {
+            when (val state = servicesUiState) {
+                is ServicesUiState.Loading -> {
+                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = spacing.extraLarge), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                is ServicesUiState.Success -> {
+                    Column {
+                        for (service in state.services) {
+                            ServiceListCard(
+                                service = service,
+                                onClick = { selectedService = service }
+                            )
+                            Spacer(modifier = Modifier.height(spacing.medium))
+                        }
+                    }
+                }
+                is ServicesUiState.Empty -> {
+                    Text("No hay servicios disponibles en este momento.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(spacing.extraLarge))
+                }
+                is ServicesUiState.Error -> {
+                    Text("Error: ${state.message}", color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(spacing.extraLarge))
+                }
+            }
         }
         
         item {
@@ -124,7 +137,7 @@ fun HomeScreen(
             ServiceDetailContent(
                 service = selectedService!!,
                 onReserveClick = {
-                    onServiceClick(selectedService!!.name)
+                    onServiceClick(selectedService!!.nombre)
                     selectedService = null
                 }
             )
@@ -157,11 +170,10 @@ fun HeaderSection(userName: String) {
     }
 }
 
-// El resto de los componentes (ServiceListCard, ServiceDetailContent) se mantienen igual...
 
 @Composable
 fun ServiceListCard(
-    serviceItem: ServiceItem,
+    service: Service,
     onClick: () -> Unit
 ) {
     val dimens = AdaptiveTheme.dimens
@@ -173,9 +185,7 @@ fun ServiceListCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(dimens.cornerRadius),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -186,18 +196,14 @@ fun ServiceListCard(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Icon Container
                 Box(
                     modifier = Modifier
                         .size(dimens.iconLarge)
-                        .background(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                            CircleShape
-                        ),
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = serviceItem.icon,
+                        imageVector = getServiceIcon(service.icono),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(dimens.iconSmall)
@@ -207,7 +213,7 @@ fun ServiceListCard(
                 Spacer(modifier = Modifier.width(spacing.medium))
 
                 Text(
-                    text = serviceItem.name,
+                    text = service.nombre,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontSize = typography.title,
                         fontWeight = FontWeight.SemiBold,
@@ -215,8 +221,6 @@ fun ServiceListCard(
                     )
                 )
             }
-            
-            // Flecha indicadora sutil
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
@@ -228,7 +232,7 @@ fun ServiceListCard(
 
 @Composable
 fun ServiceDetailContent(
-    service: ServiceItem,
+    service: Service,
     onReserveClick: () -> Unit
 ) {
     val spacing = AdaptiveTheme.spacing
@@ -239,18 +243,15 @@ fun ServiceDetailContent(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = spacing.large)
-            .padding(bottom = spacing.extraLarge + 20.dp), // Padding extra para safe area
+            .padding(bottom = spacing.extraLarge + 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Icono Grande Centrado
         Box(
-            modifier = Modifier
-                .size(80.dp)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
+            modifier = Modifier.size(80.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = service.icon,
+                imageVector = getServiceIcon(service.icono),
                 contentDescription = null,
                 modifier = Modifier.size(40.dp),
                 tint = MaterialTheme.colorScheme.primary
@@ -259,61 +260,37 @@ fun ServiceDetailContent(
 
         Spacer(modifier = Modifier.height(spacing.medium))
 
-        // Título
         Text(
-            text = service.name,
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontSize = typography.headline,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            ),
+            text = service.nombre,
+            style = MaterialTheme.typography.headlineMedium.copy(fontSize = typography.headline, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface),
             textAlign = TextAlign.Center
         )
 
         Spacer(modifier = Modifier.height(spacing.small))
 
-        // Precio
         Text(
-            text = service.price,
-            style = MaterialTheme.typography.titleLarge.copy(
-                fontSize = typography.title,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary
-            ),
+            text = formatCurrencyCOP(service.precio), // Usar el precio del modelo
+            style = MaterialTheme.typography.titleLarge.copy(fontSize = typography.title, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary),
             textAlign = TextAlign.Center
         )
 
         Spacer(modifier = Modifier.height(spacing.large))
-        
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-        
         Spacer(modifier = Modifier.height(spacing.large))
 
-        // Descripción
         Text(
-            text = service.description,
-            style = MaterialTheme.typography.bodyLarge.copy(
-                fontSize = typography.body,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                lineHeight = 24.sp
-            ),
+            text = service.descripcion,
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = typography.body, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 24.sp),
             textAlign = TextAlign.Center
         )
 
         Spacer(modifier = Modifier.height(spacing.extraLarge))
 
-        // Botón Reservar
         Button(
             onClick = onReserveClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(dimens.buttonHeight),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ),
-            shape = RoundedCornerShape(dimens.cornerRadius),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+            modifier = Modifier.fillMaxWidth().height(dimens.buttonHeight),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
+            shape = RoundedCornerShape(dimens.cornerRadius)
         ) {
             Text(
                 text = "Reservar",

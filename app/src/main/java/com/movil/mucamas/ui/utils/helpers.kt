@@ -6,6 +6,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 import com.google.firebase.firestore.FirebaseFirestore
 import com.movil.mucamas.ui.models.Service
+import java.text.NumberFormat
+import java.util.Locale
 
 fun uploadServicesToFirestore(
     onSuccess: () -> Unit,
@@ -26,6 +28,13 @@ fun uploadServicesToFirestore(
 }
 
 
+fun formatCurrencyCOP(value: Long): String {
+    val localeCO = Locale("es", "CO")
+    val formatter = NumberFormat.getCurrencyInstance(localeCO)
+    formatter.maximumFractionDigits = 0
+    formatter.minimumFractionDigits = 0
+    return formatter.format(value)
+}
 
 fun getSampleServices() : List<Service> {
     val servicesSeed = listOf(
