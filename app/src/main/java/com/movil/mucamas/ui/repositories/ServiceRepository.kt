@@ -33,6 +33,9 @@ class ServiceRepository {
             .get()
             .await()
 
+        val serviceDocument = snapshot.documents.firstOrNull()
+        val serviceObject = serviceDocument?.toObject(Service::class.java)
+        serviceObject?.updateId(serviceDocument?.id)
         return snapshot.documents.firstOrNull()?.toObject(Service::class.java)
     }
 }

@@ -31,10 +31,10 @@ data class Reservation(
 )
 
 data class Address(
-    val city: String = "",
-    val neighborhood: String = "",
-    val street: String = "",
-    val notes: String = ""
+    val city: String = "Chigorodó",
+    val neighborhood: String = "Kennedy",
+    val street: String = "Calle 123 #45-67",
+    val notes: String = "Servicio adomicilio"
 )
 
 enum class ReservationStatus {
