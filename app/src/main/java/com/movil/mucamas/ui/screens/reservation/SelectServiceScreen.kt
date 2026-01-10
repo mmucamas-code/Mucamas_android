@@ -142,7 +142,8 @@ fun SelectServiceScreen(
                 item {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.Start
+                        horizontalAlignment = Alignment.Start,
+                        verticalArrangement = Arrangement.Center
                     ) {
                         Text(
                             text = "Total a pagar",
@@ -151,7 +152,10 @@ fun SelectServiceScreen(
                             )
                         )
                         Spacer(modifier = Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.Bottom) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
                             Text(
                                 text = formatCurrencyCOP(service?.precio ?: 0),
                                 style = MaterialTheme.typography.headlineSmall.copy(
