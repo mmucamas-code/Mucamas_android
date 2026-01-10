@@ -57,6 +57,7 @@ import com.movil.mucamas.ui.models.Service
 import com.movil.mucamas.ui.utils.AdaptiveTheme
 import com.movil.mucamas.ui.utils.formatCurrencyCOP
 import com.movil.mucamas.ui.utils.formatDuration
+import com.movil.mucamas.ui.viewmodels.LoginUiState
 import com.movil.mucamas.ui.viewmodels.ReservationUiState
 import com.movil.mucamas.ui.viewmodels.ReservationViewModel
 import com.movil.mucamas.ui.viewmodels.SelectedServiceViewModel
@@ -125,11 +126,15 @@ fun SelectServiceScreen(
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
                 enabled = uiState !is ReservationUiState.Loading
             ) {
-                Text(
-                    text = "Confirmar y pagar",
-                    fontSize = typography.button,
-                    fontWeight = FontWeight.Bold
-                )
+                if (uiState is ReservationUiState.Loading) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
+                } else {
+                    Text(
+                        text = "Confirmar y pagar",
+                        fontSize = typography.button,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -231,10 +236,7 @@ fun SelectServiceScreen(
 
     // --- MANEJO DE ESTADOS DE LA UI ---
     when (val state = uiState) {
-        is ReservationUiState.Loading -> {
-            // Podrías mostrar un overlay de carga aquí
-            CircularProgressIndicator()
-        }
+        is ReservationUiState.Loading -> { }
 
         is ReservationUiState.ReservationCreated -> {
             // Navega a la pantalla de éxito o confirmación
