@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +25,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -227,28 +229,20 @@ fun ReservationActionButtons(
             ReservationStatus.PENDING_PAYMENT,
             ReservationStatus.CONFIRMED,
             ReservationStatus.IN_PROGRESS -> {
-                CancelButton(
-                    onClick = onCancelClick,
-                    modifier = Modifier.weight(1f)
-                )
+                CancelButton(onClick = onCancelClick)
             }
 
             ReservationStatus.COMPLETED -> {
-                RateButton(
-                    onClick = onRateClick,
-                    modifier = Modifier.weight(1f)
-                )
+                RateButton(onClick = onRateClick)
             }
 
             else -> Unit
         }
 
-        /*
+
         DetailButton(
             onClick = onDetailClick,
-            modifier = Modifier.weight(1f)
         )
-         */
 
         Spacer(modifier = Modifier.width(0.dp))
     }
@@ -256,49 +250,59 @@ fun ReservationActionButtons(
 
 @Composable
 private fun CancelButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onClick: () -> Unit
 ) {
-    OutlinedButton(
+    TextButton(
         onClick = onClick,
-        modifier = modifier.height(48.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = ButtonDefaults.outlinedButtonColors(
-            contentColor = MaterialTheme.colorScheme.error
-        ),
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
-        )
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Text(
             text = "Cancelar",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+        )
+    }
+}
+
+
+@Composable
+private fun RateButton(
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
+            contentColor = MaterialTheme.colorScheme.secondary
+        ),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+    ) {
+        Text(
+            text = "Calificar",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium
         )
     }
 }
 
 @Composable
-private fun RateButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+private fun DetailButton(
+    onClick: () -> Unit
 ) {
-    Button(
+    TextButton(
         onClick = onClick,
-        modifier = modifier.height(48.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.secondary
-        )
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Text(
-            text = "Calificar",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold
+            text = "Ver detalle",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary
         )
     }
 }
+
 
 @Composable
 private fun DetailButton(
