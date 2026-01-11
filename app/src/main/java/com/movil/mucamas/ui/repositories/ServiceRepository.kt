@@ -1,9 +1,11 @@
 package com.movil.mucamas.ui.repositories
 
+import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.snapshots
 import com.google.firebase.firestore.ktx.toObjects
 import com.movil.mucamas.ui.models.Service
+import com.movil.mucamas.ui.screens.login.LoginScreen
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
@@ -36,6 +38,7 @@ class ServiceRepository {
         val serviceDocument = snapshot.documents.firstOrNull()
         val serviceObject = serviceDocument?.toObject(Service::class.java)
         serviceObject?.updateId(serviceDocument?.id)
-        return snapshot.documents.firstOrNull()?.toObject(Service::class.java)
+        Log.d("Session", "Service: $serviceObject")
+        return serviceObject
     }
 }

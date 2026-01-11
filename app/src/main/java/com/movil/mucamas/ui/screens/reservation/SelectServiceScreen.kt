@@ -1,5 +1,6 @@
 package com.movil.mucamas.ui.screens.reservation
 
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -63,14 +64,13 @@ import com.movil.mucamas.ui.viewmodels.SelectedServiceViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.String
 
 @Composable
 fun SelectServiceScreen(
     selectedServiceViewModel: SelectedServiceViewModel = SelectedServiceViewModel(),
     reservationViewModel: ReservationViewModel = viewModel(),
     serviceName: String?,
-    onContinueClick: (String) -> Unit = {}
+    onContinueClick: (String) -> Unit
 ) {
     val spacing = AdaptiveTheme.spacing
     val dimens = AdaptiveTheme.dimens
@@ -79,16 +79,10 @@ fun SelectServiceScreen(
     var service by remember { mutableStateOf<Service?>(null) }
     val uiState by reservationViewModel.uiState.collectAsState()
 
-    // Mock states
     var selectedPaymentMethod by remember { mutableStateOf("Efectivo") }
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf("Viernes, 15 Oct 2025") } // Default Mock Date
     val selectedTime = "15:00" // Formato 24h para lógica interna
-
-    // State para la alerta
-    var showAvailabilityAlert by remember { mutableStateOf(false) }
-    var availableAt by remember { mutableStateOf("") }
-
 
     LaunchedEffect(serviceName) {
         if (serviceName != null) {
@@ -101,17 +95,18 @@ fun SelectServiceScreen(
             Button(
                 onClick = {
                     val newReservation = Reservation(
-                        clientId = "", // TODO: Reemplazar con el ID del usuario actual
                         serviceId = service?.id ?: "",
                         serviceName = service?.nombre ?: "",
                         price = service?.precio?.toLong() ?: 0,
                         date = selectedDate,
                         startTime = selectedTime,
-                        endTime = "", // TODO: Calcular endTime basado en la duración
-                        address = Address(),
+                        address = Address(), // TODO: Use real address
                         paymentMethod = if (selectedPaymentMethod == "Efectivo") PaymentMethod.CASH else PaymentMethod.CREDIT_CARD
                     )
-                    reservationViewModel.createReservation(newReservation)
+                    reservationViewModel.createReservation(
+                        newReservation,
+                        service?.duracionMinutos?.toInt() ?: 0
+                    )
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -158,7 +153,6 @@ fun SelectServiceScreen(
                 Spacer(modifier = Modifier.height(spacing.large))
             }
 
-            // 1) Card de Resumen
             item {
                 SummaryCard(
                     serviceName = service?.nombre ?: "--",
@@ -186,7 +180,7 @@ fun SelectServiceScreen(
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        horizontalArrangement = Arrangement.Start
                     ) {
                         Text(
                             text = formatCurrencyCOP(service?.precio ?: 0),
@@ -234,66 +228,49 @@ fun SelectServiceScreen(
     }
 
     // --- MANEJO DE ESTADOS DE LA UI ---
-    when (val state = uiState) {
-        is ReservationUiState.Loading -> { }
-
-        is ReservationUiState.ReservationCreated -> {
-            // Navega a la pantalla de éxito o confirmación
-            LaunchedEffect(state.reservationId) {
-                onContinueClick(state.reservationId)
-            }
-        }
-
-        is ReservationUiState.ShowAvailabilityAlert -> {
-            showAvailabilityAlert = true
-            availableAt = state.availableAt
-        }
-
-        is ReservationUiState.Error -> {
-            // Muestra un Snackbar o un dialogo de error
-            // Por ahora, lo mostraremos en la consola para depuración
-            LaunchedEffect(state.message) {
-                println("Error en reserva: ${state.message} ")
-            }
-        }
-
-        is ReservationUiState.Idle -> {
-            // No se hace nada
-        }
-    }
-
-    if (showAvailabilityAlert) {
+    val uiStateValue = uiState
+    if (uiStateValue is ReservationUiState.ShowAvailabilityAlert) {
         AlertDialog(
-            onDismissRequest = { showAvailabilityAlert = false },
+            onDismissRequest = { reservationViewModel.resetState() },
             title = { Text("Sin disponibilidad inmediata") },
-            text = { Text("No tenemos un colaborador disponible a esa hora. El más cercano estará libre a las $availableAt. ¿Deseas crear la reserva y esperar a que se asigne un colaborador?") },
+            text = { Text("El próximo colaborador estará disponible a las ${uiStateValue.suggestedStartTime}. ¿Deseas agendar la reserva para esa hora?") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val newReservation = Reservation(
-                            clientId = "", // TODO: Reemplazar con el ID del usuario actual
-                            serviceId = service?.id ?: "",
-                            serviceName = service?.nombre ?: "",
-                            price = service?.precio?.toLong() ?: 0,
-                            date = selectedDate,
-                            startTime = selectedTime,
-                            endTime = "", // TODO: Calcular endTime basado en la duración
-                            address = Address(),
-                            paymentMethod = if (selectedPaymentMethod == "Efectivo") PaymentMethod.CASH else PaymentMethod.CREDIT_CARD
+                        reservationViewModel.createReservationForNextAvailable(
+                            baseReservation = uiStateValue.originalReservation,
+                            nextCollaborator = uiStateValue.nextCollaborator,
+                            suggestedStartTime = uiStateValue.suggestedStartTime,
+                            serviceDurationMinutes = service?.duracionMinutos?.toInt() ?: 0
                         )
-                        reservationViewModel.proceedWithReservation(newReservation)
-                        showAvailabilityAlert = false
                     }
                 ) {
                     Text("Aceptar")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAvailabilityAlert = false }) {
+                TextButton(onClick = { reservationViewModel.resetState() }) {
                     Text("Cancelar")
                 }
             }
         )
+    }
+
+    when (uiState) {
+        is ReservationUiState.ReservationCreated -> {
+            LaunchedEffect(uiState) {
+                onContinueClick((uiState as ReservationUiState.ReservationCreated).reservationId)
+                reservationViewModel.resetState()
+            }
+        }
+        is ReservationUiState.Error -> {
+            LaunchedEffect(uiState) {
+                // TODO: Mostrar un Snackbar con el error
+                Log.d("Session", (uiState as ReservationUiState.Error).message)
+                reservationViewModel.resetState()
+            }
+        }
+        else -> {}
     }
 
     if (showDatePicker) {

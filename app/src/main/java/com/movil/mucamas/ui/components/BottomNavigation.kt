@@ -23,11 +23,28 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.movil.mucamas.ui.utils.AdaptiveTheme
 
-sealed class BottomNavItem(val label: String, val icon: ImageVector) {
-    data object Home : BottomNavItem("Inicio", Icons.Default.Home)
-    data object Reservations : BottomNavItem("Mis Reservas", Icons.Default.DateRange)
-    data object Profile : BottomNavItem("Perfil", Icons.Default.Person)
+sealed class BottomNavItem(
+    val id: String,
+    val label: String,
+    val icon: ImageVector
+) {
+    data object Home : BottomNavItem("home", "Inicio", Icons.Default.Home)
+
+    data object Reservations : BottomNavItem("reservations", "Mis Reservas", Icons.Default.DateRange)
+
+    data object Profile : BottomNavItem("profile", "Perfil", Icons.Default.Person)
+
+    companion object {
+        fun fromId(id: String?): BottomNavItem =
+            when (id) {
+                "home" -> Home
+                "reservations" -> Reservations
+                "profile" -> Profile
+                else -> Home
+            }
+    }
 }
+
 
 @Composable
 fun MucamasBottomBar(

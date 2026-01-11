@@ -36,6 +36,7 @@ fun SplashScreen(
     */
 
     LaunchedEffect(sessionState) {
+        Log.d("Session","$sessionState")
         when (sessionState) {
             is SessionResult.Success -> onNavigateToHome()
             is SessionResult.Empty -> onNavigateToAuth()

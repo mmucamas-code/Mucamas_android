@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
@@ -33,8 +34,20 @@ val bottomNavItemSaver = Saver<BottomNavItem, String>(
 
 @Composable
 fun MainScreen(navController: NavController) {
+
     var currentSection: BottomNavItem by rememberSaveable(stateSaver = bottomNavItemSaver) { 
         mutableStateOf(BottomNavItem.Home) 
+    }
+
+    val savedStateHandle =
+        navController.currentBackStackEntry?.savedStateHandle
+
+    LaunchedEffect(Unit) {
+        savedStateHandle
+            ?.getStateFlow<String?>("SELECT_TAB", null)
+            ?.collect { tab ->
+                tab?.let { currentSection = BottomNavItem.fromId(it) }
+            }
     }
 
     Scaffold(

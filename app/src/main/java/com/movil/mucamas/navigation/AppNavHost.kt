@@ -8,6 +8,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.movil.mucamas.navigation.Screen.SelectService
+import com.movil.mucamas.ui.components.BottomNavItem
 import com.movil.mucamas.ui.screens.MainScreen
 import com.movil.mucamas.ui.screens.SplashScreen
 import com.movil.mucamas.ui.screens.WelcomeScreen
@@ -84,7 +85,16 @@ fun AppNavHost(
             arguments = listOf(navArgument("serviceName") { type = NavType.StringType })
         ) { backStackEntry ->
             val serviceName = backStackEntry.arguments?.getString("serviceName")
-            SelectServiceScreen(serviceName = serviceName)
+            SelectServiceScreen(
+                serviceName = serviceName,
+                onContinueClick = {
+                    navController.previousBackStackEntry
+                        ?.savedStateHandle
+                        ?.set("SELECT_TAB", BottomNavItem.Reservations.id)
+
+                    navController.popBackStack()
+                }
+            )
         }
 
         // Aquí irían las pantallas que se abren POR ENCIMA del MainScreen

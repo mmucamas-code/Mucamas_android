@@ -10,4 +10,16 @@ data class Service(
     val duracionMinutos: Int = 0
 ){
     fun updateId(newId: String?) { id = newId }
+
+    override fun toString(): String {
+        return """
+            id: $id
+            nombre: $nombre
+            icono: $icono
+            descripcion: $descripcion
+            precio: $precio
+            activo: $activo
+            duracionMinutos: $duracionMinutos
+        """.trimIndent()
+    }
 }

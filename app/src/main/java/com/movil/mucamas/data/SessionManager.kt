@@ -63,3 +63,22 @@ class SessionManager(private val context: Context) {
         }
     }
 }
+
+object SessionProvider {
+
+    private lateinit var sessionManager: SessionManager
+
+    fun init(context: Context) {
+        if (!::sessionManager.isInitialized) {
+            sessionManager = SessionManager(context.applicationContext)
+        }
+    }
+
+    fun get(): SessionManager {
+        check(::sessionManager.isInitialized) {
+            "SessionProvider no inicializado. Llama init() en Application"
+        }
+        return sessionManager
+    }
+}
+
