@@ -53,9 +53,9 @@ import com.movil.mucamas.data.model.SessionResult
 import com.movil.mucamas.data.model.UserSession
 import com.movil.mucamas.ui.models.Service
 import com.movil.mucamas.ui.utils.AdaptiveTheme
-import com.movil.mucamas.ui.utils.formatCurrencyCOP
-import com.movil.mucamas.ui.utils.formatDuration
-import com.movil.mucamas.ui.utils.getServiceIcon
+import com.movil.mucamas.ui.utils.FormatsHelpers.formatCurrencyCOP
+import com.movil.mucamas.ui.utils.FormatsHelpers.formatDuration
+import com.movil.mucamas.ui.utils.FirebaseHelpers.getServiceIcon
 import com.movil.mucamas.ui.viewmodels.HomeViewModel
 import com.movil.mucamas.ui.viewmodels.MainViewModel
 import com.movil.mucamas.ui.viewmodels.ServicesUiState

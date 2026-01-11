@@ -55,9 +55,8 @@ import com.movil.mucamas.ui.models.PaymentMethod
 import com.movil.mucamas.ui.models.Reservation
 import com.movil.mucamas.ui.models.Service
 import com.movil.mucamas.ui.utils.AdaptiveTheme
-import com.movil.mucamas.ui.utils.formatCurrencyCOP
-import com.movil.mucamas.ui.utils.formatDuration
-import com.movil.mucamas.ui.viewmodels.LoginUiState
+import com.movil.mucamas.ui.utils.FormatsHelpers.formatCurrencyCOP
+import com.movil.mucamas.ui.utils.FormatsHelpers.formatDuration
 import com.movil.mucamas.ui.viewmodels.ReservationUiState
 import com.movil.mucamas.ui.viewmodels.ReservationViewModel
 import com.movil.mucamas.ui.viewmodels.SelectedServiceViewModel

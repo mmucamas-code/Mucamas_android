@@ -1,5 +1,6 @@
 package com.movil.mucamas.ui.viewmodels
 
+import Collaborator
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.movil.mucamas.ui.models.Reservation
@@ -24,6 +25,11 @@ class ReservationViewModel(
 
     private val _uiState = MutableStateFlow<ReservationUiState>(ReservationUiState.Idle)
     val uiState: StateFlow<ReservationUiState> = _uiState.asStateFlow()
+
+    fun calculateSuggestedTime(collaborator: Collaborator): Long {
+        return collaborator.availableAt
+            ?: System.currentTimeMillis()
+    }
 
     fun createReservation(reservation: Reservation) {
         viewModelScope.launch {

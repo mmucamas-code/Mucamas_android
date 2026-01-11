@@ -14,9 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.movil.mucamas.data.model.SessionResult
-import com.movil.mucamas.ui.utils.uploadServicesToFirestore
 import com.movil.mucamas.ui.viewmodels.MainViewModel
-import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(
