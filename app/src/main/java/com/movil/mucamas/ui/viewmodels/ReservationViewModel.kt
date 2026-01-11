@@ -57,7 +57,7 @@ class ReservationViewModel(
             _uiState.update { it.copy(isLoading = true) }
             sessionManager.userSessionFlow.collect { userSession ->
                 if (userSession != null) {
-                    reservationRepository.getReservationsByUserId(userSession.userId)
+                    reservationRepository.getReservations(userSession.userId, userSession.role)
                         .catch { e ->
                             _eventFlow.emit(ReservationUiEvent.ShowError("Error al cargar las reservas: ${e.message}"))
                             _uiState.update { it.copy(isLoading = false) }

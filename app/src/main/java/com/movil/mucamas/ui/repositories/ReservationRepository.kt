@@ -1,4 +1,3 @@
-
 package com.movil.mucamas.ui.repositories
 
 import Collaborator
@@ -9,6 +8,7 @@ import com.google.firebase.firestore.snapshots
 import com.movil.mucamas.ui.models.Reservation
 import com.movil.mucamas.ui.models.ReservationRating
 import com.movil.mucamas.ui.models.ReservationStatus
+import com.movil.mucamas.ui.models.UserRole
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -32,10 +32,14 @@ class ReservationRepository {
         return doc.id
     }
 
-    fun getReservationsByUserId(userId: String): Flow<List<Reservation>> = callbackFlow {
-        val listener = reservations
-            .whereEqualTo("clientId", userId)
-            .orderBy("createdAt", Query.Direction.DESCENDING)
+    fun getReservations(userId: String, role: UserRole): Flow<List<Reservation>> = callbackFlow {
+        val query = when (role) {
+            UserRole.CLIENT -> reservations.whereEqualTo("clientId", userId)
+            UserRole.COLLABORATOR -> reservations.whereEqualTo("collaboratorId", userId)
+            UserRole.ADMIN -> reservations
+        }
+
+        val listener = query.orderBy("createdAt", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     close(error)
