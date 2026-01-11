@@ -1,6 +1,9 @@
 package com.movil.mucamas.ui.models
 
+import androidx.compose.ui.graphics.Color
 import com.google.firebase.firestore.ServerTimestamp
+import com.movil.mucamas.ui.theme.OrangeAccent
+import com.movil.mucamas.ui.theme.TurquoiseMain
 import java.util.Date
 
 data class Reservation(
@@ -37,13 +40,40 @@ data class Address(
     val notes: String = "Servicio adomicilio"
 )
 
-enum class ReservationStatus {
-    PENDING_ASSIGNMENT,
-    PENDING_PAYMENT,
-    CONFIRMED,
-    IN_PROGRESS,
-    COMPLETED,
-    CANCELLED
+enum class ReservationStatus(
+    val label: String,
+    val color: Color
+) {
+
+    PENDING_ASSIGNMENT(
+        label = "Pendiente de asignación",
+        color = OrangeAccent
+    ),
+
+    PENDING_PAYMENT(
+        label = "Pendiente de pago",
+        color = Color(0xFFFFA726) // naranja suave
+    ),
+
+    CONFIRMED(
+        label = "Confirmada",
+        color = TurquoiseMain
+    ),
+
+    IN_PROGRESS(
+        label = "En progreso",
+        color = Color.Blue
+    ),
+
+    COMPLETED(
+        label = "Completada",
+        color = Color(0xFF4CAF50) // verde éxito
+    ),
+
+    CANCELLED(
+        label = "Cancelada",
+        color = Color(0xFFE53935) // rojo error
+    )
 }
 
 enum class PaymentStatus {

@@ -2,10 +2,13 @@ package com.movil.mucamas.ui.repositories
 
 import Collaborator
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.snapshots
 import com.movil.mucamas.ui.models.Reservation
 import com.movil.mucamas.ui.models.ReservationStatus
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import java.util.Date
@@ -26,11 +29,21 @@ class ReservationRepository {
         return doc.id
     }
 
-    fun getReservationsByClient(clientId: String): Flow<List<Reservation>> {
-        return reservations
-            .whereEqualTo("clientId", clientId)
-            .snapshots()
-            .map { it.toObjects(Reservation::class.java) }
+    fun getReservationsByUserId(userId: String): Flow<List<Reservation>> = callbackFlow {
+        val listener = reservations
+            .whereEqualTo("clientId", userId)
+            .orderBy("createdAt", Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val reservations = snapshot.toObjects(Reservation::class.java)
+                    trySend(reservations).isSuccess
+                }
+            }
+        awaitClose { listener.remove() }
     }
 
     suspend fun updateStatus(

@@ -2,6 +2,8 @@ package com.movil.mucamas.ui.viewmodels
 
 
 import Collaborator
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.movil.mucamas.data.SessionManager
@@ -13,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -20,6 +23,7 @@ import java.util.Calendar
 
 sealed interface ReservationUiState {
     object Idle : ReservationUiState
+
     object Loading : ReservationUiState
     data class ReservationCreated(val reservationId: String) : ReservationUiState
     data class ShowAvailabilityAlert(
@@ -28,6 +32,10 @@ sealed interface ReservationUiState {
         val originalReservation: Reservation
     ) : ReservationUiState
     data class Error(val message: String) : ReservationUiState
+
+    data class Success(val reservations: List<Reservation>) : ReservationUiState
+
+    object Empty : ReservationUiState
 }
 
 class ReservationViewModel(
@@ -38,6 +46,30 @@ class ReservationViewModel(
     val uiState: StateFlow<ReservationUiState> = _uiState.asStateFlow()
 
     private val sessionManager = SessionProvider.get()
+
+    init { loadReservations() }
+
+    private fun loadReservations() {
+        viewModelScope.launch {
+            sessionManager.userSessionFlow.collect { userSession ->
+                if (userSession != null) {
+                    reservationRepository.getReservationsByUserId(userSession.userId)
+                        .catch { e ->
+                            _uiState.value = ReservationUiState.Error("Error al cargar las reservas: ${e.message}")
+                        }
+                        .collect { reservations ->
+                            if (reservations.isEmpty()) {
+                                _uiState.value = ReservationUiState.Empty
+                            } else {
+                                _uiState.value = ReservationUiState.Success(reservations)
+                            }
+                        }
+                } else {
+                    _uiState.value = ReservationUiState.Error("No se pudo obtener la sesión del usuario.")
+                }
+            }
+        }
+    }
 
     fun createReservation(reservation: Reservation, serviceDurationMinutes: Int) {
         viewModelScope.launch {
