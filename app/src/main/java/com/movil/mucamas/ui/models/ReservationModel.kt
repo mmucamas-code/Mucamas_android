@@ -26,12 +26,23 @@ data class Reservation(
     val paymentStatus: PaymentStatus = PaymentStatus.PENDING,
     val paymentMethod: PaymentMethod? = null,
 
+    val ratings: List<ReservationRating> = emptyList(),
+
     @ServerTimestamp
     val createdAt: Date? = null,
 
     @ServerTimestamp
     val updatedAt: Date? = null
 )
+
+data class ReservationRating(
+    val userId: String = "",
+    val role: UserRole = UserRole.CLIENT,
+    val score: Int = 0, // 1..5
+    val comment: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
 
 data class Address(
     val city: String = "Chigorodó",

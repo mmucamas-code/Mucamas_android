@@ -1,8 +1,6 @@
 package com.movil.mucamas.ui.models
 
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ServerTimestamp
-import kotlinx.coroutines.tasks.await
 import java.util.Date
 
 data class UserDto(
@@ -22,10 +20,16 @@ data class UserDto(
 
     val verificationStatus: String = "pending",
     val biometricsEnabled: Boolean = false,
-    val role: String = "customer",
+    val role: UserRole = UserRole.CLIENT,
     val loginMethods: LoginMethodsDto = LoginMethodsDto(),
     val metadata: MetadataDto = MetadataDto()
 )
+
+enum class UserRole {
+    CLIENT,
+    COLLABORATOR,
+    ADMIN
+}
 
 data class LoginMethodsDto(
     val otp: Boolean = false,
