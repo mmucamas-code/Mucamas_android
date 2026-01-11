@@ -1,7 +1,7 @@
+
 package com.movil.mucamas.ui.screens.myreservations
 
 import android.util.Log
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,7 +54,7 @@ fun MyReservationsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showRateModal by remember { mutableStateOf(false) }
-    var selectedServiceToRate by remember { mutableStateOf<Reservation?>(null) }
+    var selectedReservationToRate by remember { mutableStateOf<Reservation?>(null) }
 
     Box(
         modifier = Modifier
@@ -66,37 +66,39 @@ fun MyReservationsScreen(
             is ReservationUiState.Loading -> {
                 FullScreenLoading()
             }
+
             is ReservationUiState.Success -> {
                 ReservationsList(
                     reservations = state.reservations,
                     onRateClick = {
-                        selectedServiceToRate = it
+                        selectedReservationToRate = it
                         showRateModal = true
                     }
                 )
             }
+
             is ReservationUiState.Empty -> {
                 EmptyStateView()
             }
+
             is ReservationUiState.Error -> {
                 Log.d("sesion", "Error: ${state.message}")
-                Text("${state.message}")
             }
 
             else -> {}
         }
 
-        if (showRateModal && selectedServiceToRate != null) {
+        if (showRateModal && selectedReservationToRate != null) {
             RateServiceScreen(
-                serviceName = selectedServiceToRate!!.serviceName,
+                serviceName = selectedReservationToRate!!.serviceName,
                 onDismissRequest = {
                     showRateModal = false
-                    selectedServiceToRate = null
+                    selectedReservationToRate = null
                 },
                 onSubmit = { rating, comment ->
-                    // TODO: Handle rating submission
+                    viewModel.rateReservation(selectedReservationToRate!!.id, rating, comment)
                     showRateModal = false
-                    selectedServiceToRate = null
+                    selectedReservationToRate = null
                 }
             )
         }
@@ -179,14 +181,16 @@ fun ReservationCard(
                     Box(
                         modifier = Modifier
                             .background(
-                                (reservation.status.color ?: MaterialTheme.colorScheme.outline).copy(alpha = 0.1f),
+                                (reservation.status.color
+                                    ?: MaterialTheme.colorScheme.outline).copy(alpha = 0.1f),
                                 RoundedCornerShape(8.dp)
                             )
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text(
                             text = reservation.status.label,
-                            color = reservation.status.color ?: MaterialTheme.colorScheme.outline,
+                            color = reservation.status.color
+                                ?: MaterialTheme.colorScheme.outline,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                         )
@@ -324,4 +328,3 @@ private fun DetailButton(
         )
     }
 }
-

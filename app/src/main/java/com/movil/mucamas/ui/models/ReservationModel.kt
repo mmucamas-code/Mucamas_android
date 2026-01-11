@@ -40,7 +40,9 @@ data class ReservationRating(
     val role: UserRole = UserRole.CLIENT,
     val score: Int = 0, // 1..5
     val comment: String = "",
-    val createdAt: Long = System.currentTimeMillis()
+
+    @ServerTimestamp
+    val createdAt: Date? = null
 )
 
 

@@ -1,5 +1,5 @@
-package com.movil.mucamas.ui.viewmodels
 
+package com.movil.mucamas.ui.viewmodels
 
 import Collaborator
 import android.app.Application
@@ -9,7 +9,9 @@ import androidx.lifecycle.viewModelScope
 import com.movil.mucamas.data.SessionManager
 import com.movil.mucamas.data.SessionProvider
 import com.movil.mucamas.ui.models.Reservation
+import com.movil.mucamas.ui.models.ReservationRating
 import com.movil.mucamas.ui.models.ReservationStatus
+import com.movil.mucamas.ui.models.UserRole
 import com.movil.mucamas.ui.repositories.ReservationRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,12 +22,15 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import java.util.Date
 
 sealed interface ReservationUiState {
     object Idle : ReservationUiState
 
     object Loading : ReservationUiState
     data class ReservationCreated(val reservationId: String) : ReservationUiState
+
+    object ReservationRated : ReservationUiState
     data class ShowAvailabilityAlert(
         val nextCollaborator: Collaborator,
         val suggestedStartTime: String,
@@ -47,7 +52,9 @@ class ReservationViewModel(
 
     private val sessionManager = SessionProvider.get()
 
-    init { loadReservations() }
+    init {
+        loadReservations()
+    }
 
     private fun loadReservations() {
         viewModelScope.launch {
@@ -55,7 +62,8 @@ class ReservationViewModel(
                 if (userSession != null) {
                     reservationRepository.getReservationsByUserId(userSession.userId)
                         .catch { e ->
-                            _uiState.value = ReservationUiState.Error("Error al cargar las reservas: ${e.message}")
+                            _uiState.value =
+                                ReservationUiState.Error("Error al cargar las reservas: ${e.message}")
                         }
                         .collect { reservations ->
                             if (reservations.isEmpty()) {
@@ -65,7 +73,8 @@ class ReservationViewModel(
                             }
                         }
                 } else {
-                    _uiState.value = ReservationUiState.Error("No se pudo obtener la sesión del usuario.")
+                    _uiState.value =
+                        ReservationUiState.Error("No se pudo obtener la sesión del usuario.")
                 }
             }
         }
@@ -102,9 +111,9 @@ class ReservationViewModel(
     }
 
     fun createReservationForNextAvailable(
-        baseReservation: Reservation, 
-        nextCollaborator: Collaborator, 
-        suggestedStartTime: String, 
+        baseReservation: Reservation,
+        nextCollaborator: Collaborator,
+        suggestedStartTime: String,
         serviceDurationMinutes: Int
     ) {
         viewModelScope.launch {
@@ -117,7 +126,10 @@ class ReservationViewModel(
         }
     }
 
-    private suspend fun assignCollaboratorAndCreate(reservation: Reservation, collaboratorId: String) {
+    private suspend fun assignCollaboratorAndCreate(
+        reservation: Reservation,
+        collaboratorId: String
+    ) {
         val reservationWithCollaborator = reservation.copy(
             collaboratorId = collaboratorId,
             status = ReservationStatus.PENDING_PAYMENT
@@ -127,7 +139,8 @@ class ReservationViewModel(
             reservationRepository.assignCollaborator(reservationId, collaboratorId)
             _uiState.value = ReservationUiState.ReservationCreated(reservationId)
         } catch (e: Exception) {
-            _uiState.value = ReservationUiState.Error("Error al asignar colaborador y crear reserva: ${e.message}")
+            _uiState.value =
+                ReservationUiState.Error("Error al asignar colaborador y crear reserva: ${e.message}")
         }
     }
 
@@ -136,10 +149,16 @@ class ReservationViewModel(
             reservationRepository.getNextAvailableCollaborator().collect { nextCollaborator ->
                 if (nextCollaborator != null) {
                     // TODO: Implementar lógica para calcular la hora sugerida real basada en nextCollaborator.availableAt
-                    val suggestedTime = "18:00" 
-                    _uiState.value = ReservationUiState.ShowAvailabilityAlert(nextCollaborator, suggestedTime, originalReservation)
+                    val suggestedTime = "18:00"
+                    _uiState.value = ReservationUiState.ShowAvailabilityAlert(
+                        nextCollaborator,
+                        suggestedTime,
+                        originalReservation
+                    )
                 } else {
-                    _uiState.value = ReservationUiState.Error("No hay colaboradores disponibles en este momento. Inténtalo más tarde.")
+                    _uiState.value = ReservationUiState.Error(
+                        "No hay colaboradores disponibles en este momento. Inténtalo más tarde."
+                    )
                 }
             }
         }
@@ -160,8 +179,36 @@ class ReservationViewModel(
                 // Manejar error si el formato de startTime no es válido
                 return ""
             }
-        } 
+        }
         return ""
+    }
+
+    fun rateReservation(reservationId: String, score: Int, comment: String) {
+        viewModelScope.launch {
+            _uiState.value = ReservationUiState.Loading
+
+            try {
+                val userSession = sessionManager.userSessionFlow.first()
+                if (userSession == null) {
+                    _uiState.value = ReservationUiState.Error("User not logged in")
+                    return@launch
+                }
+
+                val rating = ReservationRating(
+                    userId = userSession.userId,
+                    role = userSession.role,
+                    score = score,
+                    comment = comment,
+                    createdAt = Date()
+                )
+
+                reservationRepository.rateReservation(reservationId, rating)
+                _uiState.value = ReservationUiState.ReservationRated
+
+            } catch (e: Exception) {
+                _uiState.value = ReservationUiState.Error(e.message ?: "Unknown error")
+            }
+        }
     }
 
     fun resetState() {

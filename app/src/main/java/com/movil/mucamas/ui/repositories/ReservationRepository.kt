@@ -1,10 +1,13 @@
+
 package com.movil.mucamas.ui.repositories
 
 import Collaborator
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.snapshots
 import com.movil.mucamas.ui.models.Reservation
+import com.movil.mucamas.ui.models.ReservationRating
 import com.movil.mucamas.ui.models.ReservationStatus
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -100,6 +103,30 @@ class ReservationRepository {
             .map { snapshot ->
                 snapshot.documents.firstOrNull()?.toObject(Collaborator::class.java)
             }
+    }
+
+    suspend fun rateReservation(reservationId: String, rating: ReservationRating) {
+        val reservationRef = reservations.document(reservationId)
+        firestore.runTransaction { transaction ->
+            val snapshot = transaction.get(reservationRef)
+            val reservation = snapshot.toObject(Reservation::class.java)
+                ?: throw Exception("Reservation not found")
+
+            if (reservation.status != ReservationStatus.COMPLETED) {
+                throw Exception("Reservation not completed")
+            }
+
+            val existingRating = reservation.ratings.find { it.role == rating.role }
+            if (existingRating != null) {
+                throw Exception("Rating already submitted for this role")
+            }
+
+            transaction.update(
+                reservationRef,
+                "ratings",
+                FieldValue.arrayUnion(rating)
+            )
+        }.await()
     }
 
 }
