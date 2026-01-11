@@ -2,45 +2,46 @@ package com.movil.mucamas.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.firestore.FirebaseFirestore
 import com.movil.mucamas.ui.models.Service
-import com.movil.mucamas.ui.repositories.ServiceRepository
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
-// Estados de la UI para la lista de servicios
-sealed interface ServicesUiState {
-    data object Loading : ServicesUiState
-    data class Success(val services: List<Service>) : ServicesUiState
-    data object Empty : ServicesUiState // Para cuando la lista viene vacía
-    data class Error(val message: String) : ServicesUiState
+sealed class ServicesUiState {
+    object Loading : ServicesUiState()
+    data class Success(val services: List<Service>) : ServicesUiState()
+    data class Error(val message: String) : ServicesUiState()
+    object Empty : ServicesUiState()
 }
 
-class HomeViewModel(
-    private val repository: ServiceRepository = ServiceRepository()
-) : ViewModel() {
+class HomeViewModel : ViewModel() {
 
-    // Exponemos el estado de la UI como un StateFlow
-    val servicesUiState: StateFlow<ServicesUiState> = repository.getActiveServicesStream()
-        .map { services ->
-            if (services.isEmpty()) {
-                ServicesUiState.Empty
-            } else {
-                ServicesUiState.Success(services)
+    private val _servicesUiState = MutableStateFlow<ServicesUiState>(ServicesUiState.Loading)
+    val servicesUiState: StateFlow<ServicesUiState> = _servicesUiState
+
+    init {
+        fetchServices()
+    }
+
+    fun refreshServices() {
+        fetchServices()
+    }
+
+    private fun fetchServices() {
+        viewModelScope.launch {
+            try {
+                val snapshot = FirebaseFirestore.getInstance().collection("services").get().await()
+                if (snapshot.isEmpty) {
+                    _servicesUiState.value = ServicesUiState.Empty
+                } else {
+                    val services = snapshot.toObjects(Service::class.java)
+                    _servicesUiState.value = ServicesUiState.Success(services)
+                }
+            } catch (e: Exception) {
+                _servicesUiState.value = ServicesUiState.Error("Error al cargar los servicios: ${e.message}")
             }
         }
-        .catch { e ->
-            // En caso de un error en el Flow, emitimos el estado de Error
-            emit(ServicesUiState.Error(e.message ?: "Error desconocido"))
-        }
-        .stateIn(
-            scope = viewModelScope,
-            // El Flow se mantiene activo mientras la UI esté visible (Started)
-            // y se detiene 5 segundos después para ahorrar recursos (WhileSubscribed).
-            // Firestore gestiona la cancelación del listener automáticamente.
-            started = SharingStarted.WhileSubscribed(5000L),
-            initialValue = ServicesUiState.Loading // Estado inicial mientras se conecta
-        )
+    }
 }

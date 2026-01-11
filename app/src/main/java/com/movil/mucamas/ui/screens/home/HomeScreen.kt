@@ -1,5 +1,8 @@
 package com.movil.mucamas.ui.screens.home
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -47,10 +51,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.movil.mucamas.data.model.SessionResult
 import com.movil.mucamas.data.model.UserSession
 import com.movil.mucamas.ui.models.Service
+import com.movil.mucamas.ui.models.UserRole
 import com.movil.mucamas.ui.utils.AdaptiveTheme
 import com.movil.mucamas.ui.utils.FormatsHelpers.formatCurrencyCOP
 import com.movil.mucamas.ui.utils.FormatsHelpers.formatDuration
 import com.movil.mucamas.ui.utils.FirebaseHelpers.getServiceIcon
+import com.movil.mucamas.ui.viewmodels.AdminUiEvent
+import com.movil.mucamas.ui.viewmodels.AdminViewModel
 import com.movil.mucamas.ui.viewmodels.HomeViewModel
 import com.movil.mucamas.ui.viewmodels.MainViewModel
 import com.movil.mucamas.ui.viewmodels.ServicesUiState
@@ -60,7 +67,8 @@ import com.movil.mucamas.ui.viewmodels.ServicesUiState
 fun HomeScreen(
     onServiceClick: (String) -> Unit = {},
     mainViewModel: MainViewModel = viewModel(),
-    homeViewModel: HomeViewModel = viewModel()
+    homeViewModel: HomeViewModel = viewModel(),
+    adminViewModel: AdminViewModel = viewModel()
 ) {
     val spacing = AdaptiveTheme.spacing
     val sessionState by mainViewModel.sessionState.collectAsState()
@@ -70,11 +78,37 @@ fun HomeScreen(
     var selectedService by remember { mutableStateOf<Service?>(null) }
     val sheetState = rememberModalBottomSheetState()
 
+    val context = LocalContext.current
+    val contentResolver = context.contentResolver
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+        onResult = { uri ->
+            if (uri != null) {
+                adminViewModel.loadServicesFromJson(uri, contentResolver)
+            }
+        }
+    )
+
     LaunchedEffect(sessionState) {
         when (val result = sessionState) {
             is SessionResult.Success -> { userLogged = result.user }
-            is SessionResult.Empty -> { }
-            is SessionResult.Loading -> {}
+            is SessionResult.Empty -> { /* No user logged in */ }
+            is SessionResult.Loading -> { /* Loading session */ }
+        }
+    }
+
+    LaunchedEffect(key1 = true) {
+        adminViewModel.eventFlow.collect { event ->
+            when (event) {
+                is AdminUiEvent.ShowError -> {
+                    Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
+                }
+                is AdminUiEvent.ServicesLoaded -> {
+                    Toast.makeText(context, "Servicios cargados con éxito", Toast.LENGTH_SHORT).show()
+                    homeViewModel.refreshServices()
+                }
+            }
         }
     }
 
@@ -86,15 +120,26 @@ fun HomeScreen(
     ) {
         item {
             Spacer(modifier = Modifier.height(spacing.extraLarge))
-            // Pasamos el primer nombre al Header
             HeaderSection(userName = userLogged?.fullName?.substringBefore(" ") ?: "Usuario")
             Spacer(modifier = Modifier.height(spacing.extraLarge))
+        }
+
+        if (userLogged?.role == UserRole.ADMIN) {
+            item {
+                Button(onClick = { filePickerLauncher.launch("application/json") }) {
+                    Text("Cargar servicios desde JSON")
+                }
+                Spacer(modifier = Modifier.height(spacing.large))
+            }
         }
 
         item {
             when (val state = servicesUiState) {
                 is ServicesUiState.Loading -> {
-                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = spacing.extraLarge), contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = spacing.extraLarge),
+                        contentAlignment = Alignment.Center
+                    ) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                 }
@@ -110,14 +155,23 @@ fun HomeScreen(
                     }
                 }
                 is ServicesUiState.Empty -> {
-                    Text("No hay servicios disponibles.", textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(spacing.extraLarge))
+                    Text(
+                        "No hay servicios disponibles.",
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(spacing.extraLarge)
+                    )
                 }
                 is ServicesUiState.Error -> {
-                    Text("Error: ${state.message}", color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(spacing.extraLarge))
+                    Text(
+                        "Error: ${state.message}",
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(spacing.extraLarge)
+                    )
                 }
             }
         }
-        
+
         item {
             Spacer(modifier = Modifier.height(80.dp))
         }
@@ -132,7 +186,6 @@ fun HomeScreen(
             ServiceDetailContent(
                 service = selectedService!!,
                 onReserveClick = {
-                    // CORRECCIÓN: Pasar el ID del servicio en lugar del nombre
                     onServiceClick(selectedService!!.nombre)
                     selectedService = null
                 }
@@ -265,7 +318,7 @@ fun ServiceDetailContent(
 
         // Unir Precio y Duración
         Row {
-             Text(
+            Text(
                 text = formatCurrencyCOP(service.precio),
                 style = MaterialTheme.typography.titleLarge.copy(fontSize = typography.title, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary),
                 textAlign = TextAlign.Center
