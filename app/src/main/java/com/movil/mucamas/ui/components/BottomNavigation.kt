@@ -50,19 +50,14 @@ sealed class BottomNavItem(
 fun MucamasBottomBar(
     currentSection: BottomNavItem,
     onSectionSelected: (BottomNavItem) -> Unit,
+    items: List<BottomNavItem>,
     modifier: Modifier = Modifier
 ) {
-    val items = listOf(
-        BottomNavItem.Home,
-        BottomNavItem.Reservations,
-        BottomNavItem.Profile
-    )
-
     val iconSize: Dp = when (AdaptiveTheme.widthSizeClass) {
         WindowWidthSizeClass.Compact -> 24.dp
         else -> 26.dp
     }
-    
+
     val textSize = when (AdaptiveTheme.widthSizeClass) {
         WindowWidthSizeClass.Compact -> 11.sp
         else -> 12.sp
