@@ -1,6 +1,6 @@
 package com.movil.mucamas.ui.screens.reservation
 
-import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -58,7 +59,7 @@ import com.movil.mucamas.ui.models.Service
 import com.movil.mucamas.ui.utils.AdaptiveTheme
 import com.movil.mucamas.ui.utils.FormatsHelpers.formatCurrencyCOP
 import com.movil.mucamas.ui.utils.FormatsHelpers.formatDuration
-import com.movil.mucamas.ui.viewmodels.ReservationUiState
+import com.movil.mucamas.ui.viewmodels.ReservationUiEvent
 import com.movil.mucamas.ui.viewmodels.ReservationViewModel
 import com.movil.mucamas.ui.viewmodels.SelectedServiceViewModel
 import java.text.SimpleDateFormat
@@ -83,10 +84,33 @@ fun SelectServiceScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf("Viernes, 15 Oct 2025") } // Default Mock Date
     val selectedTime = "15:00" // Formato 24h para lógica interna
+    val context = LocalContext.current
+
+    var showAvailabilityAlert by remember { mutableStateOf(false) }
+    var availabilityAlertData by remember { mutableStateOf<ReservationUiEvent.ShowAvailabilityAlert?>(null) }
 
     LaunchedEffect(serviceName) {
         if (serviceName != null) {
             service = selectedServiceViewModel.getServiceByName(serviceName)
+        }
+    }
+
+    LaunchedEffect(key1 = true) {
+        reservationViewModel.eventFlow.collect { event ->
+            when (event) {
+                is ReservationUiEvent.ShowError -> {
+                    Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
+                }
+                is ReservationUiEvent.ReservationCreated -> {
+                    onContinueClick(event.reservationId)
+                    reservationViewModel.resetState()
+                }
+                is ReservationUiEvent.ShowAvailabilityAlert -> {
+                    availabilityAlertData = event
+                    showAvailabilityAlert = true
+                }
+                else -> {}
+            }
         }
     }
 
@@ -118,9 +142,9 @@ fun SelectServiceScreen(
                 ),
                 shape = RoundedCornerShape(dimens.cornerRadius),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
-                enabled = uiState !is ReservationUiState.Loading
+                enabled = !uiState.isLoading
             ) {
-                if (uiState is ReservationUiState.Loading) {
+                if (uiState.isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
                 } else {
                     Text(
@@ -227,50 +251,32 @@ fun SelectServiceScreen(
         }
     }
 
-    // --- MANEJO DE ESTADOS DE LA UI ---
-    val uiStateValue = uiState
-    if (uiStateValue is ReservationUiState.ShowAvailabilityAlert) {
+    if (showAvailabilityAlert && availabilityAlertData != null) {
         AlertDialog(
-            onDismissRequest = { reservationViewModel.resetState() },
+            onDismissRequest = { showAvailabilityAlert = false },
             title = { Text("Sin disponibilidad inmediata") },
-            text = { Text("El próximo colaborador estará disponible a las ${uiStateValue.suggestedStartTime}. ¿Deseas agendar la reserva para esa hora?") },
+            text = { Text("El próximo colaborador estará disponible a las ${availabilityAlertData!!.suggestedStartTime}. ¿Deseas agendar la reserva para esa hora?") },
             confirmButton = {
                 TextButton(
                     onClick = {
                         reservationViewModel.createReservationForNextAvailable(
-                            baseReservation = uiStateValue.originalReservation,
-                            nextCollaborator = uiStateValue.nextCollaborator,
-                            suggestedStartTime = uiStateValue.suggestedStartTime,
+                            baseReservation = availabilityAlertData!!.originalReservation,
+                            nextCollaborator = availabilityAlertData!!.nextCollaborator,
+                            suggestedStartTime = availabilityAlertData!!.suggestedStartTime,
                             serviceDurationMinutes = service?.duracionMinutos?.toInt() ?: 0
                         )
+                        showAvailabilityAlert = false
                     }
                 ) {
                     Text("Aceptar")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { reservationViewModel.resetState() }) {
+                TextButton(onClick = { showAvailabilityAlert = false }) {
                     Text("Cancelar")
                 }
             }
         )
-    }
-
-    when (uiState) {
-        is ReservationUiState.ReservationCreated -> {
-            LaunchedEffect(uiState) {
-                onContinueClick((uiState as ReservationUiState.ReservationCreated).reservationId)
-                reservationViewModel.resetState()
-            }
-        }
-        is ReservationUiState.Error -> {
-            LaunchedEffect(uiState) {
-                // TODO: Mostrar un Snackbar con el error
-                Log.d("Session", (uiState as ReservationUiState.Error).message)
-                reservationViewModel.resetState()
-            }
-        }
-        else -> {}
     }
 
     if (showDatePicker) {

@@ -1,7 +1,6 @@
-
 package com.movil.mucamas.ui.screens.myreservations
 
-import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,12 +20,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,7 +44,7 @@ import com.movil.mucamas.ui.models.ReservationStatus
 import com.movil.mucamas.ui.screens.rate.RateServiceScreen
 import com.movil.mucamas.ui.utils.AdaptiveTheme
 import com.movil.mucamas.ui.utils.FormatsHelpers
-import com.movil.mucamas.ui.viewmodels.ReservationUiState
+import com.movil.mucamas.ui.viewmodels.ReservationUiEvent
 import com.movil.mucamas.ui.viewmodels.ReservationViewModel
 
 @Composable
@@ -54,7 +53,28 @@ fun MyReservationsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showRateModal by remember { mutableStateOf(false) }
-    var selectedReservationToRate by remember { mutableStateOf<Reservation?>(null) }
+    var selectedServiceToRate by remember { mutableStateOf<Reservation?>(null) }
+    val context = LocalContext.current
+
+    LaunchedEffect(key1 = true) {
+        viewModel.eventFlow.collect { event ->
+            when (event) {
+                is ReservationUiEvent.ShowError -> {
+                    Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
+                }
+                is ReservationUiEvent.ReservationCreated -> {
+                    Toast.makeText(context, "Created", Toast.LENGTH_LONG).show()
+                }
+                is ReservationUiEvent.ReservationRated -> {
+                    Toast.makeText(context, "Calificación enviada con éxito", Toast.LENGTH_SHORT).show()
+                    showRateModal = false
+                }
+                is ReservationUiEvent.ShowAvailabilityAlert -> {
+                    // TODO: Manejar la alerta de disponibilidad
+                }
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -62,43 +82,28 @@ fun MyReservationsScreen(
             .padding(AdaptiveTheme.spacing.large),
         contentAlignment = Alignment.Center
     ) {
-        when (val state = uiState) {
-            is ReservationUiState.Loading -> {
-                FullScreenLoading()
-            }
-
-            is ReservationUiState.Success -> {
-                ReservationsList(
-                    reservations = state.reservations,
-                    onRateClick = {
-                        selectedReservationToRate = it
-                        showRateModal = true
-                    }
-                )
-            }
-
-            is ReservationUiState.Empty -> {
-                EmptyStateView()
-            }
-
-            is ReservationUiState.Error -> {
-                Log.d("sesion", "Error: ${state.message}")
-            }
-
-            else -> {}
+        if (uiState.isLoading) {
+            FullScreenLoading()
         }
 
-        if (showRateModal && selectedReservationToRate != null) {
+        if (!uiState.isLoading && uiState.isEmpty) {
+            EmptyStateView()
+        } else {
+            ReservationsList(
+                reservations = uiState.reservations,
+                onRateClick = {
+                    selectedServiceToRate = it
+                    showRateModal = true
+                }
+            )
+        }
+
+        if (showRateModal && selectedServiceToRate != null) {
             RateServiceScreen(
-                serviceName = selectedReservationToRate!!.serviceName,
-                onDismissRequest = {
-                    showRateModal = false
-                    selectedReservationToRate = null
-                },
+                serviceName = selectedServiceToRate!!.serviceName,
+                onDismissRequest = { showRateModal = false },
                 onSubmit = { rating, comment ->
-                    viewModel.rateReservation(selectedReservationToRate!!.id, rating, comment)
-                    showRateModal = false
-                    selectedReservationToRate = null
+                    viewModel.rateReservation(selectedServiceToRate!!.id, rating, comment)
                 }
             )
         }

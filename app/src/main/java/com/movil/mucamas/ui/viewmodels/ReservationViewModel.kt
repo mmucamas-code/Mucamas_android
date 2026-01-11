@@ -1,54 +1,50 @@
-
 package com.movil.mucamas.ui.viewmodels
 
 import Collaborator
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.movil.mucamas.data.SessionManager
 import com.movil.mucamas.data.SessionProvider
 import com.movil.mucamas.ui.models.Reservation
 import com.movil.mucamas.ui.models.ReservationRating
 import com.movil.mucamas.ui.models.ReservationStatus
-import com.movil.mucamas.ui.models.UserRole
 import com.movil.mucamas.ui.repositories.ReservationRepository
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Date
 
-sealed interface ReservationUiState {
-    object Idle : ReservationUiState
+data class ReservationUiState(
+    val isLoading: Boolean = false,
+    val reservations: List<Reservation> = emptyList(),
+    val isEmpty: Boolean = false
+)
 
-    object Loading : ReservationUiState
-    data class ReservationCreated(val reservationId: String) : ReservationUiState
-
-    object ReservationRated : ReservationUiState
+sealed interface ReservationUiEvent {
+    data class ShowError(val message: String) : ReservationUiEvent
+    data class ReservationCreated(val reservationId: String) : ReservationUiEvent
+    object ReservationRated : ReservationUiEvent
     data class ShowAvailabilityAlert(
         val nextCollaborator: Collaborator,
         val suggestedStartTime: String,
         val originalReservation: Reservation
-    ) : ReservationUiState
-    data class Error(val message: String) : ReservationUiState
-
-    data class Success(val reservations: List<Reservation>) : ReservationUiState
-
-    object Empty : ReservationUiState
+    ) : ReservationUiEvent
 }
 
 class ReservationViewModel(
     private val reservationRepository: ReservationRepository = ReservationRepository()
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<ReservationUiState>(ReservationUiState.Idle)
-    val uiState: StateFlow<ReservationUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(ReservationUiState())
+    val uiState = _uiState.asStateFlow()
+
+    private val _eventFlow = MutableSharedFlow<ReservationUiEvent>()
+    val eventFlow = _eventFlow.asSharedFlow()
 
     private val sessionManager = SessionProvider.get()
 
@@ -58,23 +54,26 @@ class ReservationViewModel(
 
     private fun loadReservations() {
         viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
             sessionManager.userSessionFlow.collect { userSession ->
                 if (userSession != null) {
                     reservationRepository.getReservationsByUserId(userSession.userId)
                         .catch { e ->
-                            _uiState.value =
-                                ReservationUiState.Error("Error al cargar las reservas: ${e.message}")
+                            _eventFlow.emit(ReservationUiEvent.ShowError("Error al cargar las reservas: ${e.message}"))
+                            _uiState.update { it.copy(isLoading = false) }
                         }
                         .collect { reservations ->
-                            if (reservations.isEmpty()) {
-                                _uiState.value = ReservationUiState.Empty
-                            } else {
-                                _uiState.value = ReservationUiState.Success(reservations)
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    reservations = reservations,
+                                    isEmpty = reservations.isEmpty()
+                                )
                             }
                         }
                 } else {
-                    _uiState.value =
-                        ReservationUiState.Error("No se pudo obtener la sesión del usuario.")
+                    _eventFlow.emit(ReservationUiEvent.ShowError("No se pudo obtener la sesión del usuario."))
+                    _uiState.update { it.copy(isLoading = false, isEmpty = true) }
                 }
             }
         }
@@ -82,13 +81,13 @@ class ReservationViewModel(
 
     fun createReservation(reservation: Reservation, serviceDurationMinutes: Int) {
         viewModelScope.launch {
-            _uiState.value = ReservationUiState.Loading
+            _uiState.update { it.copy(isLoading = true) }
 
-            val session = sessionManager.userSessionFlow
-                .first { it != null }
+            val session = sessionManager.userSessionFlow.first()
 
             if (session == null) {
-                _uiState.value = ReservationUiState.Error("Sesión no disponible.")
+                _eventFlow.emit(ReservationUiEvent.ShowError("Sesión no disponible."))
+                _uiState.update { it.copy(isLoading = false) }
                 return@launch
             }
 
@@ -117,7 +116,7 @@ class ReservationViewModel(
         serviceDurationMinutes: Int
     ) {
         viewModelScope.launch {
-            _uiState.value = ReservationUiState.Loading
+            _uiState.update { it.copy(isLoading = true) }
             val newReservation = baseReservation.copy(
                 startTime = suggestedStartTime,
                 endTime = calculateEndTime(suggestedStartTime, serviceDurationMinutes)
@@ -130,36 +129,42 @@ class ReservationViewModel(
         reservation: Reservation,
         collaboratorId: String
     ) {
-        val reservationWithCollaborator = reservation.copy(
-            collaboratorId = collaboratorId,
-            status = ReservationStatus.PENDING_PAYMENT
-        )
         try {
+            val reservationWithCollaborator = reservation.copy(
+                collaboratorId = collaboratorId,
+                status = ReservationStatus.PENDING_PAYMENT
+            )
             val reservationId = reservationRepository.createReservation(reservationWithCollaborator)
             reservationRepository.assignCollaborator(reservationId, collaboratorId)
-            _uiState.value = ReservationUiState.ReservationCreated(reservationId)
+            _eventFlow.emit(ReservationUiEvent.ReservationCreated(reservationId))
         } catch (e: Exception) {
-            _uiState.value =
-                ReservationUiState.Error("Error al asignar colaborador y crear reserva: ${e.message}")
+            _eventFlow.emit(ReservationUiEvent.ShowError("Error al asignar colaborador y crear reserva: ${e.message}"))
+        } finally {
+            _uiState.update { it.copy(isLoading = false) }
         }
     }
 
     private fun handleNoAvailableCollaborator(originalReservation: Reservation) {
         viewModelScope.launch {
-            reservationRepository.getNextAvailableCollaborator().collect { nextCollaborator ->
+            try {
+                val nextCollaborator = reservationRepository.getNextAvailableCollaborator().first()
                 if (nextCollaborator != null) {
                     // TODO: Implementar lógica para calcular la hora sugerida real basada en nextCollaborator.availableAt
                     val suggestedTime = "18:00"
-                    _uiState.value = ReservationUiState.ShowAvailabilityAlert(
-                        nextCollaborator,
-                        suggestedTime,
-                        originalReservation
+                    _eventFlow.emit(
+                        ReservationUiEvent.ShowAvailabilityAlert(
+                            nextCollaborator,
+                            suggestedTime,
+                            originalReservation
+                        )
                     )
                 } else {
-                    _uiState.value = ReservationUiState.Error(
-                        "No hay colaboradores disponibles en este momento. Inténtalo más tarde."
-                    )
+                    _eventFlow.emit(ReservationUiEvent.ShowError("No hay colaboradores disponibles en este momento. Inténtalo más tarde."))
                 }
+            } catch (e: Exception) {
+                _eventFlow.emit(ReservationUiEvent.ShowError("Error buscando disponibilidad: ${e.message}"))
+            } finally {
+                _uiState.update { it.copy(isLoading = false) }
             }
         }
     }
@@ -185,12 +190,13 @@ class ReservationViewModel(
 
     fun rateReservation(reservationId: String, score: Int, comment: String) {
         viewModelScope.launch {
-            _uiState.value = ReservationUiState.Loading
+            _uiState.update { it.copy(isLoading = true) }
 
             try {
                 val userSession = sessionManager.userSessionFlow.first()
                 if (userSession == null) {
-                    _uiState.value = ReservationUiState.Error("User not logged in")
+                    _eventFlow.emit(ReservationUiEvent.ShowError("User not logged in"))
+                    _uiState.update { it.copy(isLoading = false) }
                     return@launch
                 }
 
@@ -203,15 +209,17 @@ class ReservationViewModel(
                 )
 
                 reservationRepository.rateReservation(reservationId, rating)
-                _uiState.value = ReservationUiState.ReservationRated
+                _eventFlow.emit(ReservationUiEvent.ReservationRated)
 
             } catch (e: Exception) {
-                _uiState.value = ReservationUiState.Error(e.message ?: "Unknown error")
+                _eventFlow.emit(ReservationUiEvent.ShowError(e.message ?: "Unknown error"))
+            } finally {
+                _uiState.update { it.copy(isLoading = false) }
             }
         }
     }
 
     fun resetState() {
-        _uiState.value = ReservationUiState.Idle
+        _uiState.value = ReservationUiState()
     }
 }
