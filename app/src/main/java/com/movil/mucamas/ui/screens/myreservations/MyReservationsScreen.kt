@@ -1,5 +1,6 @@
 package com.movil.mucamas.ui.screens.myreservations
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +42,7 @@ import com.movil.mucamas.ui.components.EmptyStateView
 import com.movil.mucamas.ui.components.FullScreenLoading
 import com.movil.mucamas.ui.models.Reservation
 import com.movil.mucamas.ui.models.ReservationStatus
+import com.movil.mucamas.ui.models.UserRole
 import com.movil.mucamas.ui.screens.rate.RateServiceScreen
 import com.movil.mucamas.ui.utils.AdaptiveTheme
 import com.movil.mucamas.ui.utils.FormatsHelpers
@@ -48,18 +50,20 @@ import com.movil.mucamas.ui.viewmodels.ReservationUiEvent
 import com.movil.mucamas.ui.viewmodels.ReservationViewModel
 
 @Composable
-fun MyReservationsScreen(
-    viewModel: ReservationViewModel = viewModel()
-) {
+fun MyReservationsScreen(viewModel: ReservationViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     var showRateModal by remember { mutableStateOf(false) }
     var selectedServiceToRate by remember { mutableStateOf<Reservation?>(null) }
     val context = LocalContext.current
 
+    val userSession by viewModel.sessionManager.userSessionFlow.collectAsState(initial = null)
+
     LaunchedEffect(key1 = true) {
+        Log.d("sesion","$userSession")
         viewModel.eventFlow.collect { event ->
             when (event) {
                 is ReservationUiEvent.ShowError -> {
+                    Log.d("sesion", event.message)
                     Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
                 }
                 is ReservationUiEvent.ReservationCreated -> {
@@ -91,9 +95,14 @@ fun MyReservationsScreen(
         } else {
             ReservationsList(
                 reservations = uiState.reservations,
+                userRole = userSession?.role,
                 onRateClick = {
                     selectedServiceToRate = it
                     showRateModal = true
+                },
+                onCancelClick = { viewModel.cancelReservation(it.id) },
+                onUpdateStatus = { reservation, status ->
+                    viewModel.updateReservationStatus(reservation.id, status)
                 }
             )
         }
@@ -113,8 +122,10 @@ fun MyReservationsScreen(
 @Composable
 fun ReservationsList(
     reservations: List<Reservation>,
-    onCancelClick: () -> Unit = {},
-    onRateClick: (Reservation) -> Unit = {}
+    userRole: UserRole?,
+    onCancelClick: (Reservation) -> Unit = {},
+    onRateClick: (Reservation) -> Unit = {},
+    onUpdateStatus: (Reservation, ReservationStatus) -> Unit = { _, _ -> }
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -133,8 +144,12 @@ fun ReservationsList(
         items(reservations) { reservation ->
             ReservationCard(
                 reservation = reservation,
-                onCancelClick = onCancelClick,
-                onRateClick = { onRateClick(reservation) }
+                userRole = userRole,
+                onCancelClick = { onCancelClick(reservation) },
+                onRateClick = { onRateClick(reservation) },
+                onUpdateStatus = {
+                    onUpdateStatus(reservation, it)
+                }
             )
         }
         item {
@@ -146,8 +161,10 @@ fun ReservationsList(
 @Composable
 fun ReservationCard(
     reservation: Reservation,
+    userRole: UserRole?,
     onCancelClick: () -> Unit = {},
-    onRateClick: () -> Unit = {}
+    onRateClick: () -> Unit = {},
+    onUpdateStatus: (ReservationStatus) -> Unit = {}
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -210,9 +227,11 @@ fun ReservationCard(
             }
             Spacer(modifier = Modifier.height(AdaptiveTheme.spacing.medium))
             ReservationActionButtons(
-                reservationStatus = reservation.status,
+                reservation = reservation,
+                userRole = userRole,
                 onCancelClick = onCancelClick,
                 onRateClick = onRateClick,
+                onUpdateStatus = onUpdateStatus,
                 onDetailClick = { /* ver detalle */ }
             )
 
@@ -222,38 +241,52 @@ fun ReservationCard(
 
 @Composable
 fun ReservationActionButtons(
-    reservationStatus: ReservationStatus,
+    reservation: Reservation,
+    userRole: UserRole?,
     onCancelClick: () -> Unit,
     onRateClick: () -> Unit,
     onDetailClick: () -> Unit,
+    onUpdateStatus: (ReservationStatus) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        when (reservationStatus) {
-
-            ReservationStatus.PENDING_ASSIGNMENT,
-            ReservationStatus.PENDING_PAYMENT,
-            ReservationStatus.CONFIRMED,
-            ReservationStatus.IN_PROGRESS -> {
-                CancelButton(onClick = onCancelClick)
+        when (userRole) {
+            UserRole.CLIENT -> {
+                if (reservation.status in listOf(ReservationStatus.PENDING_ASSIGNMENT, ReservationStatus.PENDING_PAYMENT, ReservationStatus.CONFIRMED)) {
+                    CancelButton(onClick = onCancelClick)
+                }
+                if (reservation.status == ReservationStatus.COMPLETED) {
+                    RateButton(onClick = onRateClick)
+                }
+            }
+            UserRole.COLLABORATOR -> {
+                if (reservation.status == ReservationStatus.CONFIRMED) {
+                    ActionButton(text = "En Progreso", onClick = { onUpdateStatus(ReservationStatus.IN_PROGRESS) })
+                }
+                if (reservation.status == ReservationStatus.IN_PROGRESS) {
+                    ActionButton(text = "Completar", onClick = { onUpdateStatus(ReservationStatus.COMPLETED) })
+                }
+                if (reservation.status == ReservationStatus.COMPLETED) {
+                    RateButton(onClick = onRateClick)
+                }
+            }
+            UserRole.ADMIN -> {
+                if (reservation.status != ReservationStatus.CANCELLED) {
+                    CancelButton(onClick = onCancelClick)
+                }
+                if (reservation.status == ReservationStatus.COMPLETED) {
+                    RateButton(onClick = onRateClick)
+                }
+                // Aquí puedes agregar más botones para que el admin cambie a otros estados si es necesario
             }
 
-            ReservationStatus.COMPLETED -> {
-                RateButton(onClick = onRateClick)
-            }
-
-            else -> Unit
+            else -> {}
         }
 
-
-        DetailButton(
-            onClick = onDetailClick,
-        )
-
-        Spacer(modifier = Modifier.width(0.dp))
+        DetailButton(onClick = onDetailClick)
     }
 }
 
@@ -272,7 +305,6 @@ private fun CancelButton(
         )
     }
 }
-
 
 @Composable
 private fun RateButton(
@@ -297,6 +329,21 @@ private fun RateButton(
 }
 
 @Composable
+private fun ActionButton(text: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+@Composable
 private fun DetailButton(
     onClick: () -> Unit
 ) {
@@ -308,28 +355,6 @@ private fun DetailButton(
             text = "Ver detalle",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary
-        )
-    }
-}
-
-
-@Composable
-private fun DetailButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.height(48.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary
-        )
-    ) {
-        Text(
-            text = "Ver detalle",
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold
         )
     }
 }

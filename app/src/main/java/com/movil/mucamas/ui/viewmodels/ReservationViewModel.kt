@@ -7,6 +7,7 @@ import com.movil.mucamas.data.SessionProvider
 import com.movil.mucamas.ui.models.Reservation
 import com.movil.mucamas.ui.models.ReservationRating
 import com.movil.mucamas.ui.models.ReservationStatus
+import com.movil.mucamas.ui.models.UserRole
 import com.movil.mucamas.ui.repositories.ReservationRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,7 +47,7 @@ class ReservationViewModel(
     private val _eventFlow = MutableSharedFlow<ReservationUiEvent>()
     val eventFlow = _eventFlow.asSharedFlow()
 
-    private val sessionManager = SessionProvider.get()
+    val sessionManager = SessionProvider.get()
 
     init {
         loadReservations()
@@ -196,7 +197,15 @@ class ReservationViewModel(
                 val userSession = sessionManager.userSessionFlow.first()
                 if (userSession == null) {
                     _eventFlow.emit(ReservationUiEvent.ShowError("User not logged in"))
-                    _uiState.update { it.copy(isLoading = false) }
+                    return@launch
+                }
+
+                // La lógica de quién puede calificar ya está en el repositorio, pero podemos añadirla aquí también por consistencia
+                val reservation = _uiState.value.reservations.find { it.id == reservationId }
+                    ?: throw IllegalStateException("Reservation not found")
+
+                if (reservation.status != ReservationStatus.COMPLETED) {
+                    _eventFlow.emit(ReservationUiEvent.ShowError("Solo puedes calificar reservas completadas."))
                     return@launch
                 }
 
@@ -213,6 +222,78 @@ class ReservationViewModel(
 
             } catch (e: Exception) {
                 _eventFlow.emit(ReservationUiEvent.ShowError(e.message ?: "Unknown error"))
+            } finally {
+                _uiState.update { it.copy(isLoading = false) }
+            }
+        }
+    }
+
+    fun updateReservationStatus(reservationId: String, newStatus: ReservationStatus) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val userSession = sessionManager.userSessionFlow.first()
+                if (userSession == null) {
+                    _eventFlow.emit(ReservationUiEvent.ShowError("Usuario no autenticado."))
+                    return@launch
+                }
+
+                val reservation = _uiState.value.reservations.find { it.id == reservationId }
+                    ?: throw IllegalStateException("Reserva no encontrada.")
+
+                when (userSession.role) {
+                    UserRole.CLIENT -> {
+                        _eventFlow.emit(ReservationUiEvent.ShowError("No tienes permiso para cambiar el estado."))
+                    }
+                    UserRole.COLLABORATOR -> {
+                        if (reservation.collaboratorId != userSession.userId) {
+                            _eventFlow.emit(ReservationUiEvent.ShowError("No puedes modificar una reserva que no te pertenece."))
+                            return@launch
+                        }
+                        if (newStatus !in listOf(ReservationStatus.IN_PROGRESS, ReservationStatus.COMPLETED)) {
+                            _eventFlow.emit(ReservationUiEvent.ShowError("Solo puedes cambiar el estado a 'En Progreso' o 'Completado'."))
+                            return@launch
+                        }
+                        reservationRepository.updateStatus(reservationId, newStatus)
+                    }
+                    UserRole.ADMIN -> {
+                        reservationRepository.updateStatus(reservationId, newStatus)
+                    }
+                }
+            } catch (e: Exception) {
+                _eventFlow.emit(ReservationUiEvent.ShowError(e.message ?: "Ocurrió un error desconocido."))
+            } finally {
+                _uiState.update { it.copy(isLoading = false) }
+            }
+        }
+    }
+
+    fun cancelReservation(reservationId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val userSession = sessionManager.userSessionFlow.first()
+                if (userSession == null) {
+                    _eventFlow.emit(ReservationUiEvent.ShowError("Usuario no autenticado."))
+                    return@launch
+                }
+
+                val reservation = _uiState.value.reservations.find { it.id == reservationId }
+                    ?: throw IllegalStateException("Reserva no encontrada.")
+
+                if (userSession.role == UserRole.CLIENT && reservation.clientId == userSession.userId) {
+                    if (reservation.status in listOf(ReservationStatus.PENDING_ASSIGNMENT, ReservationStatus.PENDING_PAYMENT, ReservationStatus.CONFIRMED)) {
+                        reservationRepository.updateStatus(reservationId, ReservationStatus.CANCELLED)
+                    } else {
+                        _eventFlow.emit(ReservationUiEvent.ShowError("Esta reserva ya no se puede cancelar."))
+                    }
+                } else if (userSession.role == UserRole.ADMIN) {
+                    reservationRepository.updateStatus(reservationId, ReservationStatus.CANCELLED)
+                } else {
+                    _eventFlow.emit(ReservationUiEvent.ShowError("No tienes permisos para cancelar esta reserva."))
+                }
+            } catch (e: Exception) {
+                _eventFlow.emit(ReservationUiEvent.ShowError(e.message ?: "Ocurrió un error desconocido."))
             } finally {
                 _uiState.update { it.copy(isLoading = false) }
             }
