@@ -28,7 +28,19 @@ data class UserDto(
 enum class UserRole {
     CLIENT,
     COLLABORATOR,
-    ADMIN
+    ADMIN;
+
+    companion object{
+        fun fromString(value: String): UserRole{
+            return when(value){
+                "CLIENT" -> CLIENT
+                "COLLABORATOR" -> COLLABORATOR
+                "ADMIN" -> ADMIN
+                else -> { ADMIN }
+            }
+        }
+    }
+
 }
 
 data class LoginMethodsDto(

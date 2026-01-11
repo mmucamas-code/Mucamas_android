@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.movil.mucamas.data.model.UserSession
+import com.movil.mucamas.ui.models.UserRole
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.io.IOException
@@ -32,7 +33,7 @@ class SessionManager(private val context: Context) {
             it[USER_ID] = session.userId
             it[FULL_NAME] = session.fullName
             it[ID_NUMBER] = session.idNumber
-            it[ROLE] = session.role
+            it[ROLE] = session.role.name
         }
     }
 
@@ -57,7 +58,7 @@ class SessionManager(private val context: Context) {
         val role = it[ROLE]
 
         if (userId != null && fullName != null && idNumber != null && role != null) {
-            UserSession(userId, fullName, idNumber, role)
+            UserSession(userId, fullName, idNumber, UserRole.fromString(role))
         } else {
             null
         }

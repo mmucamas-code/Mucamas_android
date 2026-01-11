@@ -7,11 +7,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
+import com.movil.mucamas.data.SessionProvider
 import com.movil.mucamas.navigation.Screen
 import com.movil.mucamas.navigation.Screen.ConfirmReservation.createRoute
 import com.movil.mucamas.ui.components.BottomNavItem
@@ -19,6 +21,7 @@ import com.movil.mucamas.ui.components.MucamasBottomBar
 import com.movil.mucamas.ui.screens.home.HomeScreen
 import com.movil.mucamas.ui.screens.myreservations.MyReservationsScreen
 import com.movil.mucamas.ui.screens.profile.ProfileScreen
+import kotlinx.coroutines.launch
 
 val bottomNavItemSaver = Saver<BottomNavItem, String>(
     save = { it.label },
@@ -38,6 +41,8 @@ fun MainScreen(navController: NavController) {
     var currentSection: BottomNavItem by rememberSaveable(stateSaver = bottomNavItemSaver) { 
         mutableStateOf(BottomNavItem.Home) 
     }
+
+    val scope = rememberCoroutineScope()
 
     val savedStateHandle =
         navController.currentBackStackEntry?.savedStateHandle
@@ -69,6 +74,7 @@ fun MainScreen(navController: NavController) {
                 BottomNavItem.Reservations -> MyReservationsScreen()
                 BottomNavItem.Profile -> ProfileScreen(
                     onLogoutClick = {
+                        scope.launch { SessionProvider.get().clearSession() }
                         navController.navigate("auth_graph") {
                             popUpTo("main_graph") { inclusive = true }
                         }
