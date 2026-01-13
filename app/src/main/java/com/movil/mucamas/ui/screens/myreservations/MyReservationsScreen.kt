@@ -3,6 +3,7 @@ package com.movil.mucamas.ui.screens.myreservations
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -42,6 +44,7 @@ import com.movil.mucamas.ui.components.EmptyStateView
 import com.movil.mucamas.ui.components.FullScreenLoading
 import com.movil.mucamas.ui.models.Reservation
 import com.movil.mucamas.ui.models.ReservationStatus
+import com.movil.mucamas.ui.models.UserDto
 import com.movil.mucamas.ui.models.UserRole
 import com.movil.mucamas.ui.screens.rate.RateServiceScreen
 import com.movil.mucamas.ui.utils.AdaptiveTheme
@@ -58,6 +61,9 @@ fun MyReservationsScreen(
 
     var showRateModal by remember { mutableStateOf(false) }
     var selectedServiceToRate by remember { mutableStateOf<Reservation?>(null) }
+
+    var showCollaboratorSelector by remember { mutableStateOf(false) }
+    var reservationToAssign by remember { mutableStateOf<Reservation?>(null) }
     val context = LocalContext.current
 
     LaunchedEffect(key1 = true) {
@@ -68,7 +74,7 @@ fun MyReservationsScreen(
                     Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
                 }
                 is ReservationUiEvent.ReservationCreated -> {
-                    Toast.makeText(context, "Created", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Reserva creada con éxito", Toast.LENGTH_SHORT).show()
                 }
                 is ReservationUiEvent.ReservationRated -> {
                     Toast.makeText(context, "Calificación enviada con éxito", Toast.LENGTH_SHORT).show()
@@ -76,6 +82,9 @@ fun MyReservationsScreen(
                 }
                 is ReservationUiEvent.ReservationUpdated -> {
                     Toast.makeText(context, "Reserva actualizada", Toast.LENGTH_SHORT).show()
+                }
+                is ReservationUiEvent.ShowCollaboratorSelector -> {
+                    showCollaboratorSelector = true
                 }
             }
         }
@@ -102,13 +111,14 @@ fun MyReservationsScreen(
                     showRateModal = true
                 },
                 onActionClick = { reservation, action ->
+                    reservationToAssign = reservation
                     when (action) {
-                        "assign" -> viewModel.assignAvailableCollaborator(reservation.id)
+                        "assign" -> viewModel.onAssignCollaboratorClicked(reservation.id)
                         "pay" -> viewModel.processPayment(reservation.id)
                         "confirm" -> viewModel.confirmReservation(reservation.id)
                         "start" -> viewModel.startReservation(reservation.id)
-                        "complete" -> viewModel.completeReservation(reservation.id)
-                        "cancel" -> viewModel.cancelReservation(reservation.id)
+                        "complete" -> viewModel.completeReservation(reservation)
+                        "cancel" -> viewModel.cancelReservation(reservation)
                         else -> {}
                     }
                 }
@@ -124,7 +134,48 @@ fun MyReservationsScreen(
                 }
             )
         }
+
+        if (showCollaboratorSelector && reservationToAssign != null) {
+            CollaboratorSelectionDialog(
+                collaborators = uiState.availableCollaborators,
+                onDismiss = { showCollaboratorSelector = false },
+                onConfirm = { collaboratorId ->
+                    viewModel.assignCollaboratorToReservation(reservationToAssign!!.id, collaboratorId)
+                    showCollaboratorSelector = false
+                }
+            )
+        }
     }
+}
+
+@Composable
+fun CollaboratorSelectionDialog(
+    collaborators: List<UserDto>,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Asignar Colaborador") },
+        text = {
+            LazyColumn {
+                items(collaborators) { collaborator ->
+                    Text(
+                        text = collaborator.fullName,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onConfirm(collaborator.idNumber) }
+                            .padding(vertical = 16.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }
 
 @Composable
@@ -268,6 +319,7 @@ fun ReservationActionButtons(
 
         when (userRole) {
             UserRole.CLIENT -> {
+
                 if (reservation.status == ReservationStatus.PENDING_PAYMENT) {
                     ActionButton(text = "Pagar") { onActionClick("pay") }
                 }
@@ -276,7 +328,8 @@ fun ReservationActionButtons(
                         ReservationStatus.PENDING_ASSIGNMENT,
                         ReservationStatus.PENDING_PAYMENT,
                         ReservationStatus.PENDING_CONFIRMATION,
-                        ReservationStatus.CONFIRMED
+                        ReservationStatus.CONFIRMED,
+                        ReservationStatus.IN_PROGRESS
                     )) {
                     CancelButton { onActionClick("cancel") }
                 }

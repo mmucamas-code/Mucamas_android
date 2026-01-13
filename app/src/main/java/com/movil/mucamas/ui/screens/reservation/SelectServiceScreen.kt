@@ -1,5 +1,6 @@
 package com.movil.mucamas.ui.screens.reservation
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -56,6 +57,7 @@ import com.movil.mucamas.ui.models.Address
 import com.movil.mucamas.ui.models.PaymentMethod
 import com.movil.mucamas.ui.models.Reservation
 import com.movil.mucamas.ui.models.Service
+import com.movil.mucamas.ui.screens.login.LoginScreen
 import com.movil.mucamas.ui.utils.AdaptiveTheme
 import com.movil.mucamas.ui.utils.FormatsHelpers.formatCurrencyCOP
 import com.movil.mucamas.ui.utils.FormatsHelpers.formatDuration
@@ -96,6 +98,7 @@ fun SelectServiceScreen(
         reservationViewModel.eventFlow.collect { event ->
             when (event) {
                 is ReservationUiEvent.ShowError -> {
+                    Log.d("error", "${event.message}")
                     Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
                 }
                 is ReservationUiEvent.ReservationCreated -> {

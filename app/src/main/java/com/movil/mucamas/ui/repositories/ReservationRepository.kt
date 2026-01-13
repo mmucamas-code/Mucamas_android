@@ -1,10 +1,8 @@
 package com.movil.mucamas.ui.repositories
 
-import Collaborator
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.snapshots
 import com.movil.mucamas.ui.models.Reservation
 import com.movil.mucamas.ui.models.ReservationRating
 import com.movil.mucamas.ui.models.ReservationStatus
@@ -12,7 +10,6 @@ import com.movil.mucamas.ui.models.UserRole
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import java.util.Date
 
@@ -76,17 +73,6 @@ class ReservationRepository {
             )
         ).await()
     }
-
-    suspend fun findAvailableCollaborator(): Collaborator? {
-        val snapshot = firestore.collection("collaborators")
-            .whereEqualTo("isAvailable", true)
-            .limit(1)
-            .get()
-            .await()
-
-        return snapshot.documents.firstOrNull()?.toObject(Collaborator::class.java)
-    }
-
     suspend fun rateReservation(reservationId: String, rating: ReservationRating) {
         val reservationRef = reservations.document(reservationId)
         firestore.runTransaction { transaction ->
