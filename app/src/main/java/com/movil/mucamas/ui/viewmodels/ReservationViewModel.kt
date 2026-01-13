@@ -103,10 +103,8 @@ class ReservationViewModel(
                     finalReservation = newReservationStub.copy(status = ReservationStatus.PENDING_ASSIGNMENT)
                 }
 
-                // 1. Create reservation and get ID
                 val reservationId = reservationRepository.createReservation(finalReservation)
 
-                // 2. If collaborator was assigned, update their status with the new reservation ID
                 if (availableCollaborator != null) {
                     collaboratorRepository.createOrUpdateCollaborator(availableCollaborator.idNumber, reservationId)
                 }
@@ -173,7 +171,7 @@ class ReservationViewModel(
     fun completeReservation(reservation: Reservation) {
         viewModelScope.launch {
             updateReservationStatus(reservation.id, ReservationStatus.COMPLETED)
-            reservation.collaboratorId?.let { collaboratorRepository.updateCollaboratorStatus(it, reservation.id, true) }
+            reservation.collaboratorId?.let { collaboratorRepository.updateCollaboratorStatus(it, null, true) }
         }
     }
 
@@ -181,7 +179,7 @@ class ReservationViewModel(
         viewModelScope.launch {
             updateReservationStatus(reservation.id, ReservationStatus.CANCELLED)
             if (reservation.status != ReservationStatus.PENDING_ASSIGNMENT) {
-                reservation.collaboratorId?.let { collaboratorRepository.updateCollaboratorStatus(it, reservation.id, true) }
+                reservation.collaboratorId?.let { collaboratorRepository.updateCollaboratorStatus(it, null, true) }
             }
         }
     }
