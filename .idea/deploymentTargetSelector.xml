@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-01-13T20:08:34.664750Z">
+        <DropdownSelection timestamp="2026-01-13T20:34:11.924338Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="PhysicalDevice" identifier="serial=RFCT909X51P" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=/Users/jeancarlosquejadatoro/.android/avd/Galaxy_A3_TripleTen_2.avd" />
             </handle>
           </Target>
         </DropdownSelection>

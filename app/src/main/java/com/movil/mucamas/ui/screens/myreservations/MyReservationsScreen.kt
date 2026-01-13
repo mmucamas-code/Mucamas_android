@@ -113,7 +113,7 @@ fun MyReservationsScreen(
                 onActionClick = { reservation, action ->
                     reservationToAssign = reservation
                     when (action) {
-                        "assign" -> viewModel.onAssignCollaboratorClicked(reservation.id)
+                        "assign" -> viewModel.onAssignCollaboratorClicked()
                         "pay" -> viewModel.processPayment(reservation.id)
                         "confirm" -> viewModel.confirmReservation(reservation.id)
                         "start" -> viewModel.startReservation(reservation.id)
@@ -319,21 +319,17 @@ fun ReservationActionButtons(
 
         when (userRole) {
             UserRole.CLIENT -> {
-
-                if (reservation.status == ReservationStatus.PENDING_PAYMENT) {
-                    ActionButton(text = "Pagar") { onActionClick("pay") }
-                }
-
                 if (reservation.status in listOf(
                         ReservationStatus.PENDING_ASSIGNMENT,
                         ReservationStatus.PENDING_PAYMENT,
                         ReservationStatus.PENDING_CONFIRMATION,
-                        ReservationStatus.CONFIRMED,
-                        ReservationStatus.IN_PROGRESS
+                        ReservationStatus.CONFIRMED
                     )) {
                     CancelButton { onActionClick("cancel") }
                 }
-
+                if (reservation.status == ReservationStatus.PENDING_PAYMENT) {
+                    ActionButton(text = "Pagar") { onActionClick("pay") }
+                }
                 if (reservation.status == ReservationStatus.COMPLETED) {
                     RateButton(onClick = onRateClick, enabled = !hasRated)
                 }

@@ -12,38 +12,103 @@ class CollaboratorRepository {
     private val usersCollection = firestore.collection("users")
     private val collaboratorsCollection = firestore.collection("collaborators")
 
-    suspend fun getAvailableCollaborators(): List<UserDto> {
-        val collaboratorUsers = usersCollection.whereEqualTo("role", UserRole.COLLABORATOR.name).get().await()
-        val collaboratorUserIds = collaboratorUsers.map { it.id }
+    /**
+     * Finds an available collaborator, locks them transactionally, and returns their User data.
+     * This prevents race conditions where two users might be assigned the same collaborator.
+     */
+    suspend fun findAndLockAvailableCollaborator(): UserDto? {
+        // Step 1: Find a few potential candidates outside the transaction.
+        val candidatesQuery = collaboratorsCollection
+            .whereEqualTo("isAvailable", true)
+            .limit(5) // Fetch a few to reduce contention
+            .get()
+            .await()
 
-        val busyCollaborators = collaboratorsCollection.whereIn("userId", collaboratorUserIds).whereEqualTo("isAvailable", false).get().await()
-        val busyCollaboratorIds = busyCollaborators.map { it.getString("userId") }
+        // Step 2: Iterate through candidates and try to lock one transactionally.
+        for (doc in candidatesQuery.documents) {
+            try {
+                val lockedUser = firestore.runTransaction { transaction ->
+                    val freshDoc = transaction.get(doc.reference)
+                    if (freshDoc.exists() && freshDoc.getBoolean("isAvailable") == true) {
+                        // Atomically lock the collaborator
+                        transaction.update(doc.reference, "isAvailable", false)
+                        val userId = freshDoc.getString("userId")
+                        if (userId != null) {
+                            val userDoc = transaction.get(usersCollection.document(userId))
+                            userDoc.toObject(UserDto::class.java)
+                        } else {
+                            null
+                        }
+                    } else {
+                        null // Collaborator was already locked
+                    }
+                }.await()
 
-        return collaboratorUsers.filter { it.id !in busyCollaboratorIds }.map { it.toObject(UserDto::class.java) }
+                if (lockedUser != null) {
+                    return lockedUser // Success!
+                }
+            } catch (e: Exception) {
+                // Transaction failed, try next candidate
+                continue
+            }
+        }
+        return null // No collaborator could be locked
     }
 
-    suspend fun findAvailableCollaborator(): UserDto? {
-        val collaborators = getAvailableCollaborators()
-        return collaborators.firstOrNull()
+    /**
+     * Sets the reservation ID for a collaborator who has just been assigned a task.
+     */
+    suspend fun setCollaboratorReservationId(collaboratorId: String, reservationId: String) {
+        collaboratorsCollection.document(collaboratorId).update(
+            "currentReservationId", reservationId,
+            "lastUpdatedAt", System.currentTimeMillis()
+        ).await()
     }
 
-    suspend fun updateCollaboratorStatus(collaboratorId: String, reservationId: String?, isAvailable: Boolean) {
-        val collaboratorDocRef = collaboratorsCollection.document(collaboratorId)
+    /**
+     * Gets the list of collaborators who are available to be manually assigned by an Admin.
+     */
+    suspend fun getAvailableCollaboratorsForAdmin(): List<UserDto> {
+        val allCollaboratorUsers = usersCollection.whereEqualTo("role", UserRole.COLLABORATOR.name).get().await()
+        if (allCollaboratorUsers.isEmpty) return emptyList()
+
+        val userIds = allCollaboratorUsers.map { it.id }
+        val busyCollaborators = collaboratorsCollection.whereIn("userId", userIds)
+            .whereEqualTo("isAvailable", false).get().await()
+        val busyIds = busyCollaborators.mapNotNull { it.getString("userId") }
+
+        return allCollaboratorUsers.documents
+            .filter { it.id !in busyIds }
+            .mapNotNull { it.toObject(UserDto::class.java) }
+    }
+
+    /**
+     * Updates a collaborator's status, typically to release them after a reservation is completed or cancelled.
+     */
+    suspend fun setCollaboratorAvailability(collaboratorId: String, isAvailable: Boolean) {
         val updates = mapOf(
             "isAvailable" to isAvailable,
-            "currentReservationId" to reservationId,
-            "lastUpdatedAt" to System.currentTimeMillis(),
-            "availableAt" to if (isAvailable) System.currentTimeMillis() else null
+            "currentReservationId" to null, // Always clear the reservation ID when availability changes
+            "lastUpdatedAt" to System.currentTimeMillis()
         )
-        collaboratorDocRef.update(updates).await()
+        collaboratorsCollection.document(collaboratorId).update(updates).await()
     }
 
-    suspend fun createOrUpdateCollaborator(collaboratorId: String, reservationId: String) {
+    /**
+     * Assigns a reservation to a collaborator, creating their collaborator document if it's their first time.
+     * This is used for manual assignment by an Admin.
+     */
+    suspend fun assignReservationToCollaborator(collaboratorId: String, reservationId: String) {
         val collaboratorDocRef = collaboratorsCollection.document(collaboratorId)
         val docSnapshot = collaboratorDocRef.get().await()
 
         if (docSnapshot.exists()) {
-            updateCollaboratorStatus(collaboratorId, reservationId, false)
+            val updates = mapOf(
+                "isAvailable" to false,
+                "currentReservationId" to reservationId,
+                "lastUpdatedAt" to System.currentTimeMillis()
+            )
+            collaboratorDocRef.update(updates).await()
         } else {
             val newCollaborator = Collaborator(
                 userId = collaboratorId,

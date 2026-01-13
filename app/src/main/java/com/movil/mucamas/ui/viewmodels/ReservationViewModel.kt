@@ -91,7 +91,7 @@ class ReservationViewModel(
                     endTime = calculateEndTime(reservation.startTime, serviceDurationMinutes)
                 )
 
-                val availableCollaborator = collaboratorRepository.findAvailableCollaborator()
+                val availableCollaborator = collaboratorRepository.findAndLockAvailableCollaborator()
 
                 val finalReservation: Reservation
                 if (availableCollaborator != null) {
@@ -106,7 +106,7 @@ class ReservationViewModel(
                 val reservationId = reservationRepository.createReservation(finalReservation)
 
                 if (availableCollaborator != null) {
-                    collaboratorRepository.createOrUpdateCollaborator(availableCollaborator.idNumber, reservationId)
+                    collaboratorRepository.setCollaboratorReservationId(availableCollaborator.idNumber, reservationId)
                 }
 
                 _eventFlow.emit(ReservationUiEvent.ReservationCreated(reservationId))
@@ -119,13 +119,13 @@ class ReservationViewModel(
         }
     }
 
-    fun onAssignCollaboratorClicked(reservationId: String) {
+    fun onAssignCollaboratorClicked() {
         viewModelScope.launch {
             if (_userSession.value?.role != UserRole.ADMIN) return@launch
 
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val collaborators = collaboratorRepository.getAvailableCollaborators()
+                val collaborators = collaboratorRepository.getAvailableCollaboratorsForAdmin()
                 if (collaborators.isNotEmpty()) {
                     _uiState.update { it.copy(availableCollaborators = collaborators) }
                     _eventFlow.emit(ReservationUiEvent.ShowCollaboratorSelector)
@@ -146,7 +146,7 @@ class ReservationViewModel(
             _uiState.update { it.copy(isLoading = true) }
             try {
                 reservationRepository.assignCollaborator(reservationId, collaboratorId)
-                collaboratorRepository.createOrUpdateCollaborator(collaboratorId, reservationId)
+                collaboratorRepository.assignReservationToCollaborator(collaboratorId, reservationId)
                 _eventFlow.emit(ReservationUiEvent.ReservationUpdated)
             } catch (e: Exception) {
                 _eventFlow.emit(ReservationUiEvent.ShowError(e.message ?: "Error asignando colaborador."))
@@ -171,7 +171,7 @@ class ReservationViewModel(
     fun completeReservation(reservation: Reservation) {
         viewModelScope.launch {
             updateReservationStatus(reservation.id, ReservationStatus.COMPLETED)
-            reservation.collaboratorId?.let { collaboratorRepository.updateCollaboratorStatus(it, null, true) }
+            reservation.collaboratorId?.let { collaboratorRepository.setCollaboratorAvailability(it, true) }
         }
     }
 
@@ -179,7 +179,7 @@ class ReservationViewModel(
         viewModelScope.launch {
             updateReservationStatus(reservation.id, ReservationStatus.CANCELLED)
             if (reservation.status != ReservationStatus.PENDING_ASSIGNMENT) {
-                reservation.collaboratorId?.let { collaboratorRepository.updateCollaboratorStatus(it, null, true) }
+                reservation.collaboratorId?.let { collaboratorRepository.setCollaboratorAvailability(it, true) }
             }
         }
     }
