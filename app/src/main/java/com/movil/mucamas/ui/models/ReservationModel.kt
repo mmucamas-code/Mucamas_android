@@ -68,6 +68,11 @@ enum class ReservationStatus(
         color = Color(0xFFFFA726) // naranja suave
     ),
 
+    PENDING_CONFIRMATION(
+        label = "Pendiente de confirmación",
+        color = Color(0xFF4CAF50) // verde éxito
+    ),
+
     CONFIRMED(
         label = "Confirmada",
         color = TurquoiseMain

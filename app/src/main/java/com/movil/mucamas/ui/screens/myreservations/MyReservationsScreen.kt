@@ -49,7 +49,9 @@ import com.movil.mucamas.ui.viewmodels.ReservationUiEvent
 import com.movil.mucamas.ui.viewmodels.ReservationViewModel
 
 @Composable
-fun MyReservationsScreen(viewModel: ReservationViewModel = viewModel()) {
+fun MyReservationsScreen(
+    viewModel: ReservationViewModel = viewModel()
+) {
     val uiState by viewModel.uiState.collectAsState()
     val userSession by viewModel.userSession.collectAsState()
 
@@ -70,8 +72,8 @@ fun MyReservationsScreen(viewModel: ReservationViewModel = viewModel()) {
                     Toast.makeText(context, "Calificación enviada con éxito", Toast.LENGTH_SHORT).show()
                     showRateModal = false
                 }
-                is ReservationUiEvent.ShowAvailabilityAlert -> {
-                    // TODO: Manejar la alerta de disponibilidad
+                is ReservationUiEvent.ReservationUpdated -> {
+                    Toast.makeText(context, "Reserva actualizada", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -97,9 +99,16 @@ fun MyReservationsScreen(viewModel: ReservationViewModel = viewModel()) {
                     selectedServiceToRate = it
                     showRateModal = true
                 },
-                onCancelClick = { viewModel.cancelReservation(it.id) },
-                onUpdateStatus = { reservation, status ->
-                    viewModel.updateReservationStatus(reservation.id, status)
+                onActionClick = { reservation, action ->
+                    when (action) {
+                        "assign" -> viewModel.assignCollaborator(reservation.id, "<collab_id>") // TODO: Get collaborator
+                        "pay" -> viewModel.processPayment(reservation.id)
+                        "confirm" -> viewModel.confirmReservation(reservation.id)
+                        "start" -> viewModel.startReservation(reservation.id)
+                        "complete" -> viewModel.completeReservation(reservation.id)
+                        "cancel" -> viewModel.cancelReservation(reservation.id)
+                        else -> {}
+                    }
                 }
             )
         }
@@ -120,9 +129,8 @@ fun MyReservationsScreen(viewModel: ReservationViewModel = viewModel()) {
 fun ReservationsList(
     reservations: List<Reservation>,
     userRole: UserRole?,
-    onCancelClick: (Reservation) -> Unit = {},
     onRateClick: (Reservation) -> Unit = {},
-    onUpdateStatus: (Reservation, ReservationStatus) -> Unit = { _, _ -> }
+    onActionClick: (Reservation, String) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -142,10 +150,9 @@ fun ReservationsList(
             ReservationCard(
                 reservation = reservation,
                 userRole = userRole,
-                onCancelClick = { onCancelClick(reservation) },
                 onRateClick = { onRateClick(reservation) },
-                onUpdateStatus = {
-                    onUpdateStatus(reservation, it)
+                onActionClick = {
+                    onActionClick(reservation, it)
                 }
             )
         }
@@ -159,9 +166,8 @@ fun ReservationsList(
 fun ReservationCard(
     reservation: Reservation,
     userRole: UserRole?,
-    onCancelClick: () -> Unit = {},
     onRateClick: () -> Unit = {},
-    onUpdateStatus: (ReservationStatus) -> Unit = {}
+    onActionClick: (String) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -226,9 +232,8 @@ fun ReservationCard(
             ReservationActionButtons(
                 reservation = reservation,
                 userRole = userRole,
-                onCancelClick = onCancelClick,
                 onRateClick = onRateClick,
-                onUpdateStatus = onUpdateStatus,
+                onActionClick = onActionClick,
                 onDetailClick = { /* ver detalle */ }
             )
 
@@ -240,10 +245,9 @@ fun ReservationCard(
 fun ReservationActionButtons(
     reservation: Reservation,
     userRole: UserRole?,
-    onCancelClick: () -> Unit,
     onRateClick: () -> Unit,
     onDetailClick: () -> Unit,
-    onUpdateStatus: (ReservationStatus) -> Unit,
+    onActionClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -252,32 +256,49 @@ fun ReservationActionButtons(
     ) {
         when (userRole) {
             UserRole.CLIENT -> {
-                if (reservation.status in listOf(ReservationStatus.PENDING_ASSIGNMENT, ReservationStatus.PENDING_PAYMENT, ReservationStatus.CONFIRMED)) {
-                    CancelButton(onClick = onCancelClick)
-                }
-                if (reservation.status == ReservationStatus.COMPLETED) {
-                    RateButton(onClick = onRateClick)
+                when (reservation.status) {
+                    ReservationStatus.PENDING_ASSIGNMENT, ReservationStatus.PENDING_PAYMENT, ReservationStatus.PENDING_CONFIRMATION, ReservationStatus.CONFIRMED, ReservationStatus.IN_PROGRESS -> {
+                        CancelButton { onActionClick("cancel") }
+                    }
+                    ReservationStatus.PENDING_PAYMENT -> {
+                        ActionButton(text = "Pagar") { onActionClick("pay") }
+                    }
+                    ReservationStatus.COMPLETED -> {
+                        RateButton(onClick = onRateClick, enabled = reservation.ratings.none { it.role == userRole })
+                    }
+                    else -> {}
                 }
             }
             UserRole.COLLABORATOR -> {
-                if (reservation.status == ReservationStatus.CONFIRMED) {
-                    ActionButton(text = "En Progreso", onClick = { onUpdateStatus(ReservationStatus.IN_PROGRESS) })
-                }
-                if (reservation.status == ReservationStatus.IN_PROGRESS) {
-                    ActionButton(text = "Completar", onClick = { onUpdateStatus(ReservationStatus.COMPLETED) })
-                }
-                if (reservation.status == ReservationStatus.COMPLETED) {
-                    RateButton(onClick = onRateClick)
+                when (reservation.status) {
+                    ReservationStatus.CONFIRMED -> {
+                        ActionButton(text = "Empezar") { onActionClick("start") }
+                    }
+                    ReservationStatus.IN_PROGRESS -> {
+                        ActionButton(text = "Completar") { onActionClick("complete") }
+                    }
+                    ReservationStatus.COMPLETED -> {
+                        RateButton(onClick = onRateClick, enabled = reservation.ratings.none { it.role == userRole })
+                    }
+                    else -> {}
                 }
             }
             UserRole.ADMIN -> {
-                if (reservation.status != ReservationStatus.CANCELLED) {
-                    CancelButton(onClick = onCancelClick)
+                when (reservation.status) {
+                    ReservationStatus.PENDING_ASSIGNMENT -> {
+                        ActionButton(text = "Asignar") { onActionClick("assign") }
+                    }
+                    ReservationStatus.PENDING_PAYMENT, ReservationStatus.CONFIRMED, ReservationStatus.IN_PROGRESS -> {
+                        CancelButton { onActionClick("cancel") }
+                    }
+                    ReservationStatus.PENDING_CONFIRMATION -> {
+                        ActionButton(text = "Confirmar") { onActionClick("confirm") }
+                    }
+                    ReservationStatus.COMPLETED -> {
+                        RateButton(onClick = onRateClick, enabled = reservation.ratings.none { it.role == userRole })
+                    }
+                    else -> {}
                 }
-                if (reservation.status == ReservationStatus.COMPLETED) {
-                    RateButton(onClick = onRateClick)
-                }
-                // Aquí puedes agregar más botones para que el admin cambie a otros estados si es necesario
             }
 
             else -> {}
@@ -288,9 +309,7 @@ fun ReservationActionButtons(
 }
 
 @Composable
-private fun CancelButton(
-    onClick: () -> Unit
-) {
+private fun CancelButton(onClick: () -> Unit) {
     TextButton(
         onClick = onClick,
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
@@ -304,11 +323,10 @@ private fun CancelButton(
 }
 
 @Composable
-private fun RateButton(
-    onClick: () -> Unit
-) {
+private fun RateButton(onClick: () -> Unit, enabled: Boolean) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         shape = RoundedCornerShape(12.dp),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
         colors = ButtonDefaults.buttonColors(

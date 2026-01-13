@@ -86,9 +86,6 @@ fun SelectServiceScreen(
     val selectedTime = "15:00" // Formato 24h para lógica interna
     val context = LocalContext.current
 
-    var showAvailabilityAlert by remember { mutableStateOf(false) }
-    var availabilityAlertData by remember { mutableStateOf<ReservationUiEvent.ShowAvailabilityAlert?>(null) }
-
     LaunchedEffect(serviceName) {
         if (serviceName != null) {
             service = selectedServiceViewModel.getServiceByName(serviceName)
@@ -105,9 +102,8 @@ fun SelectServiceScreen(
                     onContinueClick(event.reservationId)
                     reservationViewModel.resetState()
                 }
-                is ReservationUiEvent.ShowAvailabilityAlert -> {
-                    availabilityAlertData = event
-                    showAvailabilityAlert = true
+                is ReservationUiEvent.ReservationUpdated -> {
+
                 }
                 else -> {}
             }
@@ -148,7 +144,7 @@ fun SelectServiceScreen(
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
                 } else {
                     Text(
-                        text = "Confirmar y pagar",
+                        text = "Confirmar y crear",
                         fontSize = typography.button,
                         fontWeight = FontWeight.Bold
                     )
@@ -249,34 +245,6 @@ fun SelectServiceScreen(
                 Spacer(modifier = Modifier.height(80.dp))
             }
         }
-    }
-
-    if (showAvailabilityAlert && availabilityAlertData != null) {
-        AlertDialog(
-            onDismissRequest = { showAvailabilityAlert = false },
-            title = { Text("Sin disponibilidad inmediata") },
-            text = { Text("El próximo colaborador estará disponible a las ${availabilityAlertData!!.suggestedStartTime}. ¿Deseas agendar la reserva para esa hora?") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        reservationViewModel.createReservationForNextAvailable(
-                            baseReservation = availabilityAlertData!!.originalReservation,
-                            nextCollaborator = availabilityAlertData!!.nextCollaborator,
-                            suggestedStartTime = availabilityAlertData!!.suggestedStartTime,
-                            serviceDurationMinutes = service?.duracionMinutos?.toInt() ?: 0
-                        )
-                        showAvailabilityAlert = false
-                    }
-                ) {
-                    Text("Aceptar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAvailabilityAlert = false }) {
-                    Text("Cancelar")
-                }
-            }
-        )
     }
 
     if (showDatePicker) {

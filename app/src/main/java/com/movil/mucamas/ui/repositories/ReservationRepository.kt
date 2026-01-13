@@ -35,7 +35,17 @@ class ReservationRepository {
     fun getReservations(userId: String, role: UserRole): Flow<List<Reservation>> = callbackFlow {
         val query = when (role) {
             UserRole.CLIENT -> reservations.whereEqualTo("clientId", userId)
-            UserRole.COLLABORATOR -> reservations.whereEqualTo("collaboratorId", userId)
+            UserRole.COLLABORATOR -> reservations
+                .whereEqualTo("collaboratorId", userId)
+                .whereIn(
+                    "status", listOf(
+                        ReservationStatus.PENDING_CONFIRMATION.name,
+                        ReservationStatus.CONFIRMED.name,
+                        ReservationStatus.IN_PROGRESS.name,
+                        ReservationStatus.COMPLETED.name
+                    )
+                )
+
             UserRole.ADMIN -> reservations
         }
 
@@ -53,60 +63,28 @@ class ReservationRepository {
         awaitClose { listener.remove() }
     }
 
-    suspend fun updateStatus(
-        reservationId: String,
-        status: ReservationStatus
-    ) {
-        reservations.document(reservationId)
-            .update(
-                mapOf(
-                    "status" to status.name,
-                    "updatedAt" to Date()
-                )
-            ).await()
+    suspend fun updateStatus(reservationId: String, status: ReservationStatus) {
+        reservations.document(reservationId).update("status", status.name, "updatedAt", Date()).await()
     }
 
-    suspend fun assignCollaborator(
-        reservationId: String,
-        collaboratorId: String
-    ) {
-        reservations.document(reservationId)
-            .update(
-                mapOf(
-                    "collaboratorId" to collaboratorId,
-                    "status" to ReservationStatus.PENDING_PAYMENT.name,
-                    "updatedAt" to Date()
-                )
-            ).await()
+    suspend fun assignCollaborator(reservationId: String, collaboratorId: String) {
+        reservations.document(reservationId).update(
+            mapOf(
+                "collaboratorId" to collaboratorId,
+                "status" to ReservationStatus.PENDING_PAYMENT.name,
+                "updatedAt" to Date()
+            )
+        ).await()
     }
 
-    suspend fun findAvailableCollaborator(
-        date: String,
-        startTime: String
-    ): Collaborator? {
-
+    suspend fun findAvailableCollaborator(): Collaborator? {
         val snapshot = firestore.collection("collaborators")
             .whereEqualTo("isAvailable", true)
             .limit(1)
             .get()
             .await()
 
-        return snapshot.documents.firstOrNull()
-            ?.toObject(Collaborator::class.java)
-    }
-
-    fun getNextAvailableCollaborator(): Flow<Collaborator?> {
-        val now = System.currentTimeMillis()
-
-        return firestore.collection("collaborators")
-            .whereEqualTo("isAvailable", false)
-            .whereGreaterThan("availableAt", now)
-            .orderBy("availableAt")
-            .limit(1)
-            .snapshots()
-            .map { snapshot ->
-                snapshot.documents.firstOrNull()?.toObject(Collaborator::class.java)
-            }
+        return snapshot.documents.firstOrNull()?.toObject(Collaborator::class.java)
     }
 
     suspend fun rateReservation(reservationId: String, rating: ReservationRating) {
@@ -122,15 +100,11 @@ class ReservationRepository {
 
             val existingRating = reservation.ratings.find { it.role == rating.role }
             if (existingRating != null) {
-                throw Exception("Rating already submitted for this role")
+                // No hacemos nada si ya existe una calificación
+                return@runTransaction
             }
 
-            transaction.update(
-                reservationRef,
-                "ratings",
-                FieldValue.arrayUnion(rating)
-            )
+            transaction.update(reservationRef, "ratings", FieldValue.arrayUnion(rating))
         }.await()
     }
-
 }
