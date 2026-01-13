@@ -1,6 +1,5 @@
 package com.movil.mucamas.ui.screens.myreservations
 
-import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -52,18 +51,16 @@ import com.movil.mucamas.ui.viewmodels.ReservationViewModel
 @Composable
 fun MyReservationsScreen(viewModel: ReservationViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
+    val userSession by viewModel.userSession.collectAsState()
+
     var showRateModal by remember { mutableStateOf(false) }
     var selectedServiceToRate by remember { mutableStateOf<Reservation?>(null) }
     val context = LocalContext.current
 
-    val userSession by viewModel.sessionManager.userSessionFlow.collectAsState(initial = null)
-
     LaunchedEffect(key1 = true) {
-        Log.d("sesion","$userSession")
         viewModel.eventFlow.collect { event ->
             when (event) {
                 is ReservationUiEvent.ShowError -> {
-                    Log.d("sesion", event.message)
                     Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
                 }
                 is ReservationUiEvent.ReservationCreated -> {

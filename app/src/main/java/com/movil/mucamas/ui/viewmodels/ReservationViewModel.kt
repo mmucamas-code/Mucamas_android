@@ -8,6 +8,7 @@ import com.movil.mucamas.ui.models.Reservation
 import com.movil.mucamas.ui.models.ReservationRating
 import com.movil.mucamas.ui.models.ReservationStatus
 import com.movil.mucamas.ui.models.UserRole
+import com.movil.mucamas.data.model.UserSession
 import com.movil.mucamas.ui.repositories.ReservationRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,7 +48,10 @@ class ReservationViewModel(
     private val _eventFlow = MutableSharedFlow<ReservationUiEvent>()
     val eventFlow = _eventFlow.asSharedFlow()
 
-    val sessionManager = SessionProvider.get()
+    private val _userSession = MutableStateFlow<UserSession?>(null)
+    val userSession = _userSession.asStateFlow()
+
+    private val sessionManager = SessionProvider.get()
 
     init {
         loadReservations()
@@ -57,6 +61,7 @@ class ReservationViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             sessionManager.userSessionFlow.collect { userSession ->
+                _userSession.value = userSession
                 if (userSession != null) {
                     reservationRepository.getReservations(userSession.userId, userSession.role)
                         .catch { e ->
@@ -84,8 +89,7 @@ class ReservationViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
-            val session = sessionManager.userSessionFlow.first()
-
+            val session = _userSession.value
             if (session == null) {
                 _eventFlow.emit(ReservationUiEvent.ShowError("Sesión no disponible."))
                 _uiState.update { it.copy(isLoading = false) }
@@ -150,7 +154,6 @@ class ReservationViewModel(
             try {
                 val nextCollaborator = reservationRepository.getNextAvailableCollaborator().first()
                 if (nextCollaborator != null) {
-                    // TODO: Implementar lógica para calcular la hora sugerida real basada en nextCollaborator.availableAt
                     val suggestedTime = "18:00"
                     _eventFlow.emit(
                         ReservationUiEvent.ShowAvailabilityAlert(
@@ -182,7 +185,6 @@ class ReservationViewModel(
                 val minute = calendar.get(Calendar.MINUTE)
                 return String.format("%02d:%02d", hour, minute)
             } catch (e: NumberFormatException) {
-                // Manejar error si el formato de startTime no es válido
                 return ""
             }
         }
@@ -192,15 +194,13 @@ class ReservationViewModel(
     fun rateReservation(reservationId: String, score: Int, comment: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-
             try {
-                val userSession = sessionManager.userSessionFlow.first()
+                val userSession = _userSession.value
                 if (userSession == null) {
                     _eventFlow.emit(ReservationUiEvent.ShowError("User not logged in"))
                     return@launch
                 }
 
-                // La lógica de quién puede calificar ya está en el repositorio, pero podemos añadirla aquí también por consistencia
                 val reservation = _uiState.value.reservations.find { it.id == reservationId }
                     ?: throw IllegalStateException("Reservation not found")
 
@@ -232,7 +232,7 @@ class ReservationViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val userSession = sessionManager.userSessionFlow.first()
+                val userSession = _userSession.value
                 if (userSession == null) {
                     _eventFlow.emit(ReservationUiEvent.ShowError("Usuario no autenticado."))
                     return@launch
@@ -272,7 +272,7 @@ class ReservationViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val userSession = sessionManager.userSessionFlow.first()
+                val userSession = _userSession.value
                 if (userSession == null) {
                     _eventFlow.emit(ReservationUiEvent.ShowError("Usuario no autenticado."))
                     return@launch
