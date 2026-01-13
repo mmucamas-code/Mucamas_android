@@ -100,7 +100,7 @@ fun SelectServiceScreen(
                 }
                 is ReservationUiEvent.ReservationCreated -> {
                     onContinueClick(event.reservationId)
-                    reservationViewModel.resetState()
+                    //reservationViewModel.resetState()
                 }
                 is ReservationUiEvent.ReservationUpdated -> {
 

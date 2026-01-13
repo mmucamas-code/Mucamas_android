@@ -1,6 +1,5 @@
 package com.movil.mucamas.ui.viewmodels
 
-import Collaborator
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.movil.mucamas.data.SessionProvider
@@ -15,7 +14,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -89,13 +87,13 @@ class ReservationViewModel(
                 )
 
                 val availableCollaborator = reservationRepository.findAvailableCollaborator()
-                if (availableCollaborator != null) {
-                    newReservation = newReservation.copy(
+                newReservation = if (availableCollaborator != null) {
+                    newReservation.copy(
                         collaboratorId = availableCollaborator.userId,
                         status = ReservationStatus.PENDING_PAYMENT
                     )
                 } else {
-                    newReservation = newReservation.copy(status = ReservationStatus.PENDING_ASSIGNMENT)
+                    newReservation.copy(status = ReservationStatus.PENDING_ASSIGNMENT)
                 }
 
                 val reservationId = reservationRepository.createReservation(newReservation)
@@ -108,7 +106,7 @@ class ReservationViewModel(
         }
     }
 
-    fun assignCollaborator(reservationId: String, collaboratorId: String) {
+    fun assignAvailableCollaborator(reservationId: String) {
         viewModelScope.launch {
             if (_userSession.value?.role != UserRole.ADMIN) {
                 _eventFlow.emit(ReservationUiEvent.ShowError("No tienes permisos para asignar un colaborador."))
@@ -116,8 +114,13 @@ class ReservationViewModel(
             }
             _uiState.update { it.copy(isLoading = true) }
             try {
-                reservationRepository.assignCollaborator(reservationId, collaboratorId)
-                _eventFlow.emit(ReservationUiEvent.ReservationUpdated)
+                val collaborator = reservationRepository.findAvailableCollaborator()
+                if (collaborator != null) {
+                    reservationRepository.assignCollaborator(reservationId, collaborator.userId)
+                    _eventFlow.emit(ReservationUiEvent.ReservationUpdated)
+                } else {
+                    _eventFlow.emit(ReservationUiEvent.ShowError("No hay colaboradores disponibles para asignar."))
+                }
             } catch (e: Exception) {
                 _eventFlow.emit(ReservationUiEvent.ShowError(e.message ?: "Error asignando colaborador."))
             } finally {
@@ -127,30 +130,35 @@ class ReservationViewModel(
     }
 
     fun processPayment(reservationId: String) {
-        updateReservationStatus(reservationId, ReservationStatus.PENDING_CONFIRMATION)
+        updateReservationStatus(reservationId, ReservationStatus.PENDING_CONFIRMATION, listOf(UserRole.CLIENT))
     }
 
     fun confirmReservation(reservationId: String) {
-        updateReservationStatus(reservationId, ReservationStatus.CONFIRMED)
+        updateReservationStatus(reservationId, ReservationStatus.CONFIRMED, listOf(UserRole.ADMIN))
     }
 
     fun startReservation(reservationId: String) {
-        updateReservationStatus(reservationId, ReservationStatus.IN_PROGRESS)
+        updateReservationStatus(reservationId, ReservationStatus.IN_PROGRESS, listOf(UserRole.COLLABORATOR))
     }
 
     fun completeReservation(reservationId: String) {
-        updateReservationStatus(reservationId, ReservationStatus.COMPLETED)
+        updateReservationStatus(reservationId, ReservationStatus.COMPLETED, listOf(UserRole.COLLABORATOR))
     }
 
     fun cancelReservation(reservationId: String) {
-        updateReservationStatus(reservationId, ReservationStatus.CANCELLED)
+        updateReservationStatus(reservationId, ReservationStatus.CANCELLED, listOf(UserRole.CLIENT, UserRole.ADMIN))
     }
 
-    private fun updateReservationStatus(reservationId: String, newStatus: ReservationStatus) {
+    private fun updateReservationStatus(reservationId: String, newStatus: ReservationStatus, allowedRoles: List<UserRole>) {
         viewModelScope.launch {
+            val userSession = _userSession.value
+            if (userSession == null || userSession.role !in allowedRoles) {
+                _eventFlow.emit(ReservationUiEvent.ShowError("No tienes permisos para realizar esta acción."))
+                return@launch
+            }
+
             _uiState.update { it.copy(isLoading = true) }
             try {
-                // Basic permission check - detailed logic is in the UI for button visibility
                 reservationRepository.updateStatus(reservationId, newStatus)
                 _eventFlow.emit(ReservationUiEvent.ReservationUpdated)
             } catch (e: Exception) {
@@ -177,7 +185,13 @@ class ReservationViewModel(
                     return@launch
                 }
 
-                val rating = ReservationRating(userId = userSession.userId, role = userSession.role, score = score, comment = comment)
+                val rating = ReservationRating(
+                    userId = userSession.userId,
+                    role = userSession.role,
+                    score = score,
+                    comment = comment,
+                    createdAt = System.currentTimeMillis()
+                )
                 reservationRepository.rateReservation(reservationId, rating)
                 _eventFlow.emit(ReservationUiEvent.ReservationRated)
             } catch (e: Exception) {
@@ -202,9 +216,5 @@ class ReservationViewModel(
             } catch (e: NumberFormatException) { return "" }
         }
         return ""
-    }
-
-    fun resetState() {
-        _uiState.value = ReservationUiState()
     }
 }

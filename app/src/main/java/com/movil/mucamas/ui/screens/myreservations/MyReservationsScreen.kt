@@ -1,5 +1,6 @@
 package com.movil.mucamas.ui.screens.myreservations
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -63,6 +64,7 @@ fun MyReservationsScreen(
         viewModel.eventFlow.collect { event ->
             when (event) {
                 is ReservationUiEvent.ShowError -> {
+                    Log.d("error","${event.message}")
                     Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
                 }
                 is ReservationUiEvent.ReservationCreated -> {
@@ -101,7 +103,7 @@ fun MyReservationsScreen(
                 },
                 onActionClick = { reservation, action ->
                     when (action) {
-                        "assign" -> viewModel.assignCollaborator(reservation.id, "<collab_id>") // TODO: Get collaborator
+                        "assign" -> viewModel.assignAvailableCollaborator(reservation.id)
                         "pay" -> viewModel.processPayment(reservation.id)
                         "confirm" -> viewModel.confirmReservation(reservation.id)
                         "start" -> viewModel.startReservation(reservation.id)
@@ -191,36 +193,44 @@ fun ReservationCard(
             Spacer(modifier = Modifier.height(AdaptiveTheme.spacing.medium))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.Start,
-                    verticalAlignment = Alignment.CenterVertically
+                Text(
+                    text = "Estado: ",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Box(
+                    modifier = Modifier
+                        .background(
+                            (reservation.status.color
+                                ?: MaterialTheme.colorScheme.outline).copy(alpha = 0.1f),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
-                        text = "Estado: ",
+                        text = reservation.status.label,
+                        color = reservation.status.color
+                            ?: MaterialTheme.colorScheme.outline,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
                     )
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                (reservation.status.color
-                                    ?: MaterialTheme.colorScheme.outline).copy(alpha = 0.1f),
-                                RoundedCornerShape(8.dp)
-                            )
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = reservation.status.label,
-                            color = reservation.status.color
-                                ?: MaterialTheme.colorScheme.outline,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
                 }
+            }
+            Spacer(modifier = Modifier.height(AdaptiveTheme.spacing.medium))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Start,
+            ) {
+                Text(
+                    text = "Valor: ",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
 
                 Text(
                     text = FormatsHelpers.formatCurrencyCOP(reservation.price),
@@ -254,53 +264,49 @@ fun ReservationActionButtons(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        val hasRated = reservation.ratings.any { it.role == userRole }
+
         when (userRole) {
             UserRole.CLIENT -> {
-                when (reservation.status) {
-                    ReservationStatus.PENDING_ASSIGNMENT, ReservationStatus.PENDING_PAYMENT, ReservationStatus.PENDING_CONFIRMATION, ReservationStatus.CONFIRMED, ReservationStatus.IN_PROGRESS -> {
-                        CancelButton { onActionClick("cancel") }
-                    }
-                    ReservationStatus.PENDING_PAYMENT -> {
-                        ActionButton(text = "Pagar") { onActionClick("pay") }
-                    }
-                    ReservationStatus.COMPLETED -> {
-                        RateButton(onClick = onRateClick, enabled = reservation.ratings.none { it.role == userRole })
-                    }
-                    else -> {}
+                if (reservation.status == ReservationStatus.PENDING_PAYMENT) {
+                    ActionButton(text = "Pagar") { onActionClick("pay") }
+                }
+
+                if (reservation.status in listOf(
+                        ReservationStatus.PENDING_ASSIGNMENT,
+                        ReservationStatus.PENDING_PAYMENT,
+                        ReservationStatus.PENDING_CONFIRMATION,
+                        ReservationStatus.CONFIRMED
+                    )) {
+                    CancelButton { onActionClick("cancel") }
+                }
+
+                if (reservation.status == ReservationStatus.COMPLETED) {
+                    RateButton(onClick = onRateClick, enabled = !hasRated)
                 }
             }
             UserRole.COLLABORATOR -> {
                 when (reservation.status) {
-                    ReservationStatus.CONFIRMED -> {
-                        ActionButton(text = "Empezar") { onActionClick("start") }
-                    }
-                    ReservationStatus.IN_PROGRESS -> {
-                        ActionButton(text = "Completar") { onActionClick("complete") }
-                    }
-                    ReservationStatus.COMPLETED -> {
-                        RateButton(onClick = onRateClick, enabled = reservation.ratings.none { it.role == userRole })
-                    }
+                    ReservationStatus.CONFIRMED -> ActionButton(text = "Empezar") { onActionClick("start") }
+                    ReservationStatus.IN_PROGRESS -> ActionButton(text = "Completar") { onActionClick("complete") }
+                    ReservationStatus.COMPLETED -> RateButton(onClick = onRateClick, enabled = !hasRated)
                     else -> {}
                 }
             }
             UserRole.ADMIN -> {
-                when (reservation.status) {
-                    ReservationStatus.PENDING_ASSIGNMENT -> {
-                        ActionButton(text = "Asignar") { onActionClick("assign") }
-                    }
-                    ReservationStatus.PENDING_PAYMENT, ReservationStatus.CONFIRMED, ReservationStatus.IN_PROGRESS -> {
-                        CancelButton { onActionClick("cancel") }
-                    }
-                    ReservationStatus.PENDING_CONFIRMATION -> {
-                        ActionButton(text = "Confirmar") { onActionClick("confirm") }
-                    }
-                    ReservationStatus.COMPLETED -> {
-                        RateButton(onClick = onRateClick, enabled = reservation.ratings.none { it.role == userRole })
-                    }
-                    else -> {}
+                if (reservation.status == ReservationStatus.PENDING_ASSIGNMENT) {
+                    ActionButton(text = "Asignar") { onActionClick("assign") }
+                }
+                if (reservation.status == ReservationStatus.PENDING_CONFIRMATION) {
+                    ActionButton(text = "Confirmar") { onActionClick("confirm") }
+                }
+                if (reservation.status in listOf(ReservationStatus.PENDING_PAYMENT, ReservationStatus.CONFIRMED, ReservationStatus.IN_PROGRESS)) {
+                    CancelButton { onActionClick("cancel") }
+                }
+                if (reservation.status == ReservationStatus.COMPLETED) {
+                    RateButton(onClick = onRateClick, enabled = !hasRated)
                 }
             }
-
             else -> {}
         }
 

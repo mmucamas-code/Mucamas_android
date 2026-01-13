@@ -40,9 +40,7 @@ data class ReservationRating(
     val role: UserRole = UserRole.CLIENT,
     val score: Int = 0, // 1..5
     val comment: String = "",
-
-    @ServerTimestamp
-    val createdAt: Date? = null
+    val createdAt: Long = 0L // Guardamos como Long
 )
 
 
