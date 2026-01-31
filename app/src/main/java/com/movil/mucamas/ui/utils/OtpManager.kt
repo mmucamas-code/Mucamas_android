@@ -6,7 +6,12 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 import com.movil.mucamas.R
+import com.movil.mucamas.data.model.OtpData
+import kotlinx.coroutines.tasks.await
+import java.util.concurrent.TimeUnit
 
 object OtpManager {
 
@@ -14,7 +19,7 @@ object OtpManager {
 
     fun generateAndNotifyOtp(context: Context): String {
         // 1. Generar OTP
-        val otp = (1000..9999).random().toString()
+        val otp = generateOtp()
         Log.d("OtpManager", "Generated OTP: $otp")
 
         // 2. Crear canal de notificación (si no existe)
@@ -48,5 +53,25 @@ object OtpManager {
                 context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
         }
+    }
+
+    fun generateOtp(): String {
+        return (1000..9999).random().toString()
+    }
+
+    suspend fun generateAndSaveOtp(userId: String): String {
+        val otp = generateOtp()
+        val expiresAt = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(5)
+        val otpData = OtpData(
+            code = otp,
+            expiresAt = expiresAt,
+            attempts = 0
+        )
+
+        Firebase.firestore.collection("users").document(userId)
+            .update("otp", otpData)
+            .await()
+
+        return otp
     }
 }
