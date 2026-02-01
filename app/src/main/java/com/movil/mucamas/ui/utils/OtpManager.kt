@@ -13,6 +13,17 @@ import com.movil.mucamas.data.model.OtpData
 import kotlinx.coroutines.tasks.await
 import java.util.concurrent.TimeUnit
 
+sealed class OtpVerificationResult {
+    object Success : OtpVerificationResult()
+    sealed class Error(val message: String) : OtpVerificationResult() {
+        object InvalidCode : Error("El código ingresado es incorrecto.")
+        object Expired : Error("El código ha expirado.")
+        object MaxAttemptsReached : Error("Se ha superado el número de intentos.")
+        object OtpNotFound : Error("No se encontró un código OTP para este usuario.")
+        data class FirestoreError(val exception: Exception) : Error("Ocurrió un error inesperado.")
+    }
+}
+
 object OtpManager {
 
     private const val OTP_CHANNEL_ID = "otp_channel"
@@ -73,5 +84,40 @@ object OtpManager {
             .await()
 
         return otp
+    }
+
+    suspend fun verifyOtp(userId: String, enteredOtp: String): OtpVerificationResult {
+        val userDocRef = Firebase.firestore.collection("users").document(userId)
+
+        try {
+            val document = userDocRef.get().await()
+            val otpMap = document.get("otp") as? Map<String, Any>
+                ?: return OtpVerificationResult.Error.OtpNotFound
+
+            val otpData = OtpData(
+                code = otpMap["code"] as? String ?: "",
+                expiresAt = otpMap["expiresAt"] as? Long ?: 0L,
+                attempts = (otpMap["attempts"] as? Long)?.toInt() ?: 0
+            )
+
+            if (otpData.attempts >= 3) {
+                return OtpVerificationResult.Error.MaxAttemptsReached
+            }
+
+            if (System.currentTimeMillis() > otpData.expiresAt) {
+                return OtpVerificationResult.Error.Expired
+            }
+
+            return if (otpData.code == enteredOtp) {
+                OtpVerificationResult.Success
+            } else {
+                userDocRef.update("otp.attempts", otpData.attempts + 1).await()
+                OtpVerificationResult.Error.InvalidCode
+            }
+
+        } catch (e: Exception) {
+            Log.e("OtpManager", "Error verifying OTP", e)
+            return OtpVerificationResult.Error.FirestoreError(e)
+        }
     }
 }
