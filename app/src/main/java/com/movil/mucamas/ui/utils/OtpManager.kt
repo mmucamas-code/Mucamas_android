@@ -1,5 +1,6 @@
 package com.movil.mucamas.ui.utils
 
+import com.google.firebase.firestore.FieldValue
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -118,6 +119,16 @@ object OtpManager {
         } catch (e: Exception) {
             Log.e("OtpManager", "Error verifying OTP", e)
             return OtpVerificationResult.Error.FirestoreError(e)
+        }
+    }
+
+    suspend fun deleteOtp(userId: String) {
+        try {
+            val userDocRef = Firebase.firestore.collection("users").document(userId)
+            userDocRef.update("otp", FieldValue.delete()).await()
+        } catch (e: Exception) {
+            Log.e("OtpManager", "Error deleting OTP for user $userId", e)
+            // Opcional: Manejar el error, aunque en este punto la validación ya fue exitosa.
         }
     }
 }
