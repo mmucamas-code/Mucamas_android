@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.movil.mucamas.data.SessionManager
+import com.movil.mucamas.data.model.UserSession
 import com.movil.mucamas.domain.usecase.StartOtpFlowResult
 import com.movil.mucamas.domain.usecase.StartOtpFlowUseCase
 import com.movil.mucamas.ui.screens.login.OtpLoginState
@@ -48,7 +50,7 @@ class LoginViewModel : ViewModel() {
     private val _otpVerifyState = MutableStateFlow<OtpVerificationState?>(null)
     val otpVerifyState = _otpVerifyState.asStateFlow()
 
-    fun verifyOtp(userId: String, enteredOtp: String) {
+    fun verifyOtp(context: Context,userId: String, enteredOtp: String) {
         viewModelScope.launch {
             _otpVerifyState.value = OtpVerificationState.Loading
 
@@ -56,6 +58,7 @@ class LoginViewModel : ViewModel() {
                 is OtpVerificationResult.Success -> {
                     // After successful verification, delete the OTP
                     OtpManager.deleteOtp(userId)
+                    SessionManager(context).saveUserSession(result.userSession)
                     _otpVerifyState.value = OtpVerificationState.Success
                 }
                 is OtpVerificationResult.Error -> {

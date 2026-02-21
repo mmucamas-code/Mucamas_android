@@ -194,7 +194,7 @@ fun LoginScreen(
                     loginViewModel.resetStartState()
                 },
                 onVerify = { enteredOtp ->
-                    loginViewModel.verifyOtp(identification, enteredOtp)
+                    loginViewModel.verifyOtp(context,identification, enteredOtp)
                 }
             )
         }

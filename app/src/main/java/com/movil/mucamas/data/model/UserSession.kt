@@ -3,6 +3,7 @@ package com.movil.mucamas.data.model
 import com.movil.mucamas.ui.models.UserRole
 
 data class UserSession(
+    val documentId: String = "",
     val userId: String,
     val fullName: String,
     val idNumber: String,

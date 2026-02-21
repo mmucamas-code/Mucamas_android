@@ -196,7 +196,7 @@ fun RegisterIdentityScreen(
                 onVerify = { enteredOtp ->
                     val registeredUserId = (uiState as? RegistrationUiState.RegistrationSuccess)?.userId
                     if (registeredUserId != null) {
-                        loginViewModel.verifyOtp(registeredUserId, enteredOtp)
+                        loginViewModel.verifyOtp(context,registeredUserId, enteredOtp)
                     } else {
                         Toast.makeText(context, "Error: No se encontró el ID de usuario.", Toast.LENGTH_SHORT).show()
                     }

@@ -3,6 +3,7 @@ package com.movil.mucamas.ui.models
 import com.google.firebase.firestore.DocumentId
 import com.google.firebase.firestore.ServerTimestamp
 import com.movil.mucamas.data.model.OtpData
+import com.movil.mucamas.data.model.UserSession
 import java.util.Date
 
 data class UserDto(
@@ -28,7 +29,17 @@ data class UserDto(
     val role: UserRole = UserRole.CLIENT,
     val loginMethods: LoginMethodsDto = LoginMethodsDto(),
     val metadata: MetadataDto = MetadataDto()
-)
+){
+    fun userSession(): UserSession {
+        return UserSession(
+            documentId = documentId,
+            userId = idNumber,
+            fullName = fullName,
+            idNumber = idNumber,
+            role = role
+        )
+    }
+}
 
 enum class UserRole {
     CLIENT,

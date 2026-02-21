@@ -9,11 +9,12 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.movil.mucamas.R
 import com.movil.mucamas.data.model.OtpData
+import com.movil.mucamas.data.model.UserSession
 import com.movil.mucamas.ui.repositories.UserRepository
 import java.util.concurrent.TimeUnit
 
-sealed class OtpVerificationResult {
-    object Success : OtpVerificationResult()
+sealed class OtpVerificationResult() {
+    data class Success(val userSession: UserSession) : OtpVerificationResult()
     sealed class Error(val message: String) : OtpVerificationResult() {
         object InvalidCode : Error("El código ingresado es incorrecto.")
         object Expired : Error("El código ha expirado.")
@@ -137,7 +138,7 @@ object OtpManager {
 
             // 4. Validar el código
             return if (otpData.code == enteredOtp) {
-                OtpVerificationResult.Success
+                OtpVerificationResult.Success(user.userSession())
             } else {
                 val newAttempts = otpData.attempts + 1
                 if (newAttempts >= 3) {

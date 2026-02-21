@@ -21,6 +21,7 @@ class SessionManager(private val context: Context) {
 
     companion object {
         // Claves para guardar los datos
+        private  val DOCUMENT_ID = stringPreferencesKey("document_id")
         private val USER_ID = stringPreferencesKey("user_id")
         private val FULL_NAME = stringPreferencesKey("full_name")
         private val ID_NUMBER = stringPreferencesKey("id_number")
@@ -52,16 +53,17 @@ class SessionManager(private val context: Context) {
             }
         }
         .map {
-        val userId = it[USER_ID]
-        val fullName = it[FULL_NAME]
-        val idNumber = it[ID_NUMBER]
-        val role = it[ROLE]
+            val documentId = it[DOCUMENT_ID]
+            val userId = it[USER_ID]
+            val fullName = it[FULL_NAME]
+            val idNumber = it[ID_NUMBER]
+            val role = it[ROLE]
 
-        if (userId != null && fullName != null && idNumber != null && role != null) {
-            UserSession(userId, fullName, idNumber, UserRole.fromString(role))
-        } else {
-            null
-        }
+            if (documentId != null && userId != null && fullName != null && idNumber != null && role != null) {
+                UserSession(documentId,userId, fullName, idNumber, UserRole.fromString(role))
+            } else {
+                null
+            }
     }
 }
 
