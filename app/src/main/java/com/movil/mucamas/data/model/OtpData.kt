@@ -6,5 +6,6 @@ import com.google.firebase.firestore.IgnoreExtraProperties
 data class OtpData(
     val code: String = "",
     val expiresAt: Long = 0L,
-    val attempts: Int = 0
+    val attempts: Int = 0,
+    val lockedUntil: Long? = null // Nuevo campo: timestamp de cuándo se desbloquea
 )

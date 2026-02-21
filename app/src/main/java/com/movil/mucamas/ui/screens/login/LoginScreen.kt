@@ -7,7 +7,6 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +18,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -35,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -61,45 +58,66 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.movil.mucamas.ui.utils.AdaptiveTheme
-import com.movil.mucamas.ui.viewmodels.LoginUiState
 import com.movil.mucamas.ui.viewmodels.LoginViewModel
-import com.movil.mucamas.ui.viewmodels.RegistrationUiState
-import com.movil.mucamas.ui.viewmodels.RegisterViewModel
+import com.movil.mucamas.ui.viewmodels.OtpVerificationState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit = {},
     onSignUpClick: () -> Unit = {},
-    viewModel: LoginViewModel = viewModel()
+    loginViewModel: LoginViewModel = viewModel()
 ) {
     var identification by remember { mutableStateOf("") }
-    val uiState by viewModel.uiState.collectAsState()
+    val loginState by loginViewModel.otpLoginState.collectAsState()
+    val verifyState by loginViewModel.otpVerifyState.collectAsState()
     val context = LocalContext.current
 
-    // Launcher para solicitar el permiso de notificaciones
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { isGranted ->
-            if (isGranted) {
-                // Permiso concedido, proceder a buscar usuario
-                viewModel.findUserById(identification, context)
-            } else {
-                // Permiso denegado, mostrar mensaje
-                Toast.makeText(context, "El permiso de notificaciones es necesario para el login", Toast.LENGTH_LONG).show()
-            }
-        }
-    )
-
-    // Estado local para la visibilidad de los diálogos
     var showOtpDialog by remember { mutableStateOf(false) }
-    var showErrorDialog by remember { mutableStateOf(false) }
 
-    // Observador para abrir los diálogos
-    LaunchedEffect(uiState) {
-        showOtpDialog = uiState is LoginUiState.UserFound
-        showErrorDialog = uiState is LoginUiState.UserNotFound
+    // --- Observadores de Estado ---
+
+    LaunchedEffect(loginState) {
+        when (val state = loginState) {
+            is OtpLoginState.OtpSent -> {
+                showOtpDialog = true
+                Toast.makeText(context, "Código OTP enviado a tu correo.", Toast.LENGTH_SHORT).show()
+            }
+            is OtpLoginState.InvalidId -> {
+                Toast.makeText(context, "Usuario no encontrado. Por favor, regístrate.", Toast.LENGTH_LONG).show()
+                loginViewModel.resetStartState()
+                onSignUpClick()
+            }
+            is OtpLoginState.EmailSendError -> {
+                Toast.makeText(context, "Error al enviar el correo. Intenta de nuevo.", Toast.LENGTH_LONG).show()
+                loginViewModel.resetStartState()
+            }
+            is OtpLoginState.GenericError -> {
+                Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
+                loginViewModel.resetStartState()
+            }
+            else -> { /* No-op para Loading y null */ }
+        }
     }
+
+    LaunchedEffect(verifyState) {
+        when (val state = verifyState) {
+            is OtpVerificationState.Success -> {
+                Toast.makeText(context, "¡Login Exitoso!", Toast.LENGTH_SHORT).show()
+                showOtpDialog = false
+                loginViewModel.resetVerifyState()
+                loginViewModel.resetStartState()
+                onLoginSuccess()
+            }
+            is OtpVerificationState.Error -> {
+                Toast.makeText(context, state.message, Toast.LENGTH_SHORT).show()
+                // No reseteamos el diálogo, para que el usuario pueda reintentar
+            }
+            else -> { /* No-op para Loading y null */ }
+        }
+    }
+
+    // --- UI --- 
     
     val spacing = AdaptiveTheme.spacing
     val dimens = AdaptiveTheme.dimens
@@ -124,18 +142,9 @@ fun LoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Contenido de la UI sin cambios...
-                Text(
-                    text = "Login",
-                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, fontSize = typography.headline),
-                    textAlign = TextAlign.Center
-                )
+                Text("Login", style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, fontSize = typography.headline), textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.height(spacing.small))
-                Text(
-                    text = "Welcome back, you've been missed!",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = typography.body),
-                    textAlign = TextAlign.Center
-                )
+                Text("Welcome back, you've been missed!", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = typography.body), textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.height(spacing.extraLarge))
                 OutlinedTextField(
                     value = identification,
@@ -151,34 +160,18 @@ fun LoginScreen(
                     ),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    trailingIcon = {
-                        Icon(Icons.Default.Email, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    trailingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 )
                 Spacer(modifier = Modifier.height(spacing.large))
 
-                // Botón "Continuar" que ahora solicita permiso si es necesario
                 Button(
-                    onClick = {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            when (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)) {
-                                PackageManager.PERMISSION_GRANTED -> {
-                                    viewModel.findUserById(identification, context)
-                                }
-                                else -> {
-                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                }
-                            }
-                        } else {
-                            viewModel.findUserById(identification, context)
-                        }
-                    },
+                    onClick = { loginViewModel.startOtpLoginFlow(context,identification) },
                     modifier = Modifier.fillMaxWidth().height(dimens.buttonHeight),
-                    enabled = uiState !is LoginUiState.Loading,
+                    enabled = loginState !is OtpLoginState.Loading,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
                     shape = RoundedCornerShape(dimens.cornerRadius)
                 ) {
-                    if (uiState is LoginUiState.Loading) {
+                    if (loginState is OtpLoginState.Loading) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
                     } else {
                         Text("Continuar", fontSize = typography.button, fontWeight = FontWeight.Bold)
@@ -192,40 +185,27 @@ fun LoginScreen(
             }
         }
 
-        // --- DIÁLOGOS --- 
-
         if (showOtpDialog) {
+            val isLoading = verifyState is OtpVerificationState.Loading
             OtpDialog(
-                onDismissRequest = { viewModel.resetState() },
+                isLoading = isLoading,
+                onDismissRequest = { 
+                    showOtpDialog = false
+                    loginViewModel.resetStartState()
+                },
                 onVerify = { enteredOtp ->
-                    if (viewModel.verifyOtpAndLogin(enteredOtp,context)) {
-                        Toast.makeText(context, "Login Exitoso", Toast.LENGTH_SHORT).show()
-                        viewModel.resetState()
-                        onLoginSuccess()
-                    } else {
-                        Toast.makeText(context, "Código OTP incorrecto", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            )
-        }
-
-        if (showErrorDialog) {
-            UserNotFoundDialog(
-                onDismiss = { viewModel.resetState() },
-                onRegister = {
-                    viewModel.resetState()
-                    onSignUpClick()
+                    loginViewModel.verifyOtp(identification, enteredOtp)
                 }
             )
         }
     }
 }
 
-// --- COMPONENTES DE DIÁLOGO --- 
-
+// El OtpDialog y otros componentes de diálogo se mantienen igual que antes.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OtpDialog(
+    isLoading: Boolean,
     onDismissRequest: () -> Unit,
     onVerify: (String) -> Unit
 ) {
@@ -239,7 +219,7 @@ fun OtpDialog(
             Column(modifier = Modifier.padding(spacing.large), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Verificación", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface))
                 Spacer(modifier = Modifier.height(spacing.small))
-                Text("Ingresa el código de 4 dígitos enviado a tus notificaciones.", style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), textAlign = TextAlign.Center)
+                Text("Ingresa el código de 4 dígitos enviado a tu correo.", style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.height(spacing.large))
                 Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     for (i in 0 until 4) {
@@ -272,39 +252,15 @@ fun OtpDialog(
                     Spacer(modifier = Modifier.width(spacing.small))
                     Button(
                         onClick = { onVerify(otpValues.joinToString("")) },
-                        enabled = otpValues.all { it.isNotEmpty() },
+                        enabled = otpValues.all { it.isNotEmpty() } && !isLoading,
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
                     ) {
-                        Text("Verify")
+                        if (isLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
+                        } else {
+                            Text("Verificar")
+                        }
                     }
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun UserNotFoundDialog(
-    onDismiss: () -> Unit,
-    onRegister: () -> Unit
-) {
-    BasicAlertDialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(AdaptiveTheme.spacing.medium),
-            shape = RoundedCornerShape(AdaptiveTheme.dimens.cornerRadius),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(modifier = Modifier.padding(AdaptiveTheme.spacing.large), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "Usuario no encontrado", 
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                )
-                Spacer(modifier = Modifier.height(AdaptiveTheme.spacing.medium))
-                Text("El número de identificación no está registrado. Por favor, crea una cuenta.", style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant), textAlign = TextAlign.Center)
-                Spacer(modifier = Modifier.height(AdaptiveTheme.spacing.large))
-                Button(onClick = onRegister, modifier = Modifier.fillMaxWidth()) {
-                    Text("Crear Cuenta")
                 }
             }
         }

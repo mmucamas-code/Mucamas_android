@@ -59,8 +59,10 @@ dependencies {
     // Firebase - Añadir el Bill of Materials (BoM)
     implementation(platform(libs.firebase.bom))
     // Añadir las dependencias específicas de Firebase que necesitas
-    implementation("com.google.firebase:firebase-firestore")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services")
+    implementation(libs.firebase.firestore)
+    implementation(libs.kotlinx.coroutines.play.services)
+
+    implementation(libs.bundles.network)
 
     // Gson
     implementation(libs.gson)

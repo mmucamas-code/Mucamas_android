@@ -47,6 +47,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.movil.mucamas.ui.utils.AdaptiveTheme
+import com.movil.mucamas.ui.viewmodels.LoginViewModel
+import com.movil.mucamas.ui.viewmodels.OtpVerificationState
 import com.movil.mucamas.ui.viewmodels.RegisterViewModel
 import com.movil.mucamas.ui.viewmodels.RegistrationUiState
 
@@ -55,9 +57,11 @@ import com.movil.mucamas.ui.viewmodels.RegistrationUiState
 fun RegisterIdentityScreen(
     onRegistrationSuccess: () -> Unit = {},
     onLoginClick: () -> Unit = {},
-    viewModel: RegisterViewModel = viewModel()
+    registerViewModel: RegisterViewModel = viewModel(),
+    loginViewModel: LoginViewModel = viewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by registerViewModel.uiState.collectAsState()
+    val otpVerifyState by loginViewModel.otpVerifyState.collectAsState()
     val context = LocalContext.current
 
     var identification by remember { mutableStateOf("") }
@@ -67,18 +71,31 @@ fun RegisterIdentityScreen(
     var address by remember { mutableStateOf("") }
     
     var showOtpDialog by remember { mutableStateOf(false) }
-    var showUserExistsDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState) {
         val state = uiState
         showOtpDialog = state is RegistrationUiState.RegistrationSuccess
-        showUserExistsDialog = state is RegistrationUiState.UserAlreadyExists
         
-        if (state is RegistrationUiState.RegistrationSuccess) {
-            // El diálogo OTP se mostrará automáticamente
-        } else if (state is RegistrationUiState.UserAlreadyExists) {
+        if (state is RegistrationUiState.UserAlreadyExists) {
             Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
-            viewModel.resetState()
+            registerViewModel.resetState()
+        }
+    }
+
+    LaunchedEffect(otpVerifyState) {
+        when (val state = otpVerifyState) {
+            is OtpVerificationState.Success -> {
+                Toast.makeText(context, "¡Login exitoso!", Toast.LENGTH_SHORT).show()
+                loginViewModel.resetVerifyState()
+                onRegistrationSuccess() // Navega al Home
+            }
+            is OtpVerificationState.Error -> {
+                Toast.makeText(context, state.message, Toast.LENGTH_SHORT).show()
+                loginViewModel.resetVerifyState()
+            }
+            else -> {
+                // No hacer nada para Loading o null
+            }
         }
     }
 
@@ -130,7 +147,7 @@ fun RegisterIdentityScreen(
 
                 Button(
                     onClick = { 
-                        viewModel.registerUser(identification, fullName, phone, email, address, context)
+                        registerViewModel.registerUser(context,identification, fullName, phone, email, address)
                     },
                     modifier = Modifier.fillMaxWidth().height(dimens.buttonHeight),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
@@ -169,18 +186,19 @@ fun RegisterIdentityScreen(
         }
         
         if (showOtpDialog) {
+            val isLoading = otpVerifyState is OtpVerificationState.Loading
             OtpDialog(
+                isLoading = isLoading,
                 onDismissRequest = { 
-                    viewModel.resetState()
+                    registerViewModel.resetState()
                     onLoginClick() // Si cancela, lo mandamos a Login
                 },
                 onVerify = { enteredOtp ->
-                    if (viewModel.verifyOtpAndLogin(enteredOtp, context)) {
-                        Toast.makeText(context, "Registro y Login exitosos!", Toast.LENGTH_SHORT).show()
-                        viewModel.resetState()
-                        onRegistrationSuccess() // Navega al Home
+                    val registeredUserId = (uiState as? RegistrationUiState.RegistrationSuccess)?.userId
+                    if (registeredUserId != null) {
+                        loginViewModel.verifyOtp(registeredUserId, enteredOtp)
                     } else {
-                        Toast.makeText(context, "Código OTP incorrecto", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Error: No se encontró el ID de usuario.", Toast.LENGTH_SHORT).show()
                     }
                 }
             )

@@ -1,15 +1,20 @@
 package com.movil.mucamas.ui.models
 
+import com.google.firebase.firestore.DocumentId
 import com.google.firebase.firestore.ServerTimestamp
+import com.movil.mucamas.data.model.OtpData
 import java.util.Date
 
 data class UserDto(
+    @DocumentId
+    val documentId: String = "",
     val idNumber: String = "",
     val fullName: String = "",
     val phone: String = "",
     val email: String = "",
     val mainAddress: String = "",
     val quickRegistration: Boolean = true,
+    val otp: OtpData? = null,
 
     // @ServerTimestamp le dice a Firestore que use la hora del servidor al escribir
     @ServerTimestamp

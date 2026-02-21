@@ -1,6 +1,7 @@
 package com.movil.mucamas.ui.repositories
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.movil.mucamas.data.model.OtpData
 import com.movil.mucamas.ui.models.UserDto
 import kotlinx.coroutines.tasks.await
 
@@ -38,7 +39,7 @@ class UserRepository {
                 .limit(1)
                 .get()
                 .await()
-            
+
             if (querySnapshot.isEmpty) {
                 Result.success(null) // Usuario no encontrado
             } else {
@@ -48,6 +49,74 @@ class UserRepository {
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateUserOtp(documentId: String, otpData: OtpData): Result<Boolean> {
+        return try {
+            collection.document(documentId)
+                .update("otp", otpData)
+                .await()
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun lockOtp(documentId: String, lockDurationMillis: Long): Result<Boolean> {
+        return try {
+            val unlockTime = System.currentTimeMillis() + lockDurationMillis
+            collection.document(documentId)
+                .update("otp.lockedUntil", unlockTime)
+                .await()
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Resetea el contador de intentos y limpia el tiempo de bloqueo.
+     */
+    suspend fun resetOtpAttempts(documentId: String): Result<Boolean> {
+        return try {
+            collection.document(documentId)
+                .update(
+                    "otp.attempts", 0,
+                    "otp.lockedUntil", null // Eliminamos el bloqueo
+                )
+                .await()
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Incrementa el contador de intentos fallidos dentro del objeto otp.
+     */
+    suspend fun incrementOtpAttempts(documentId: String, currentAttempts: Int): Result<Boolean> {
+        return try {
+            collection.document(documentId)
+                .update("otp.attempts", currentAttempts + 1)
+                .await()
+            Result.success(true)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Elimina el campo 'otp' del documento del usuario.
+     */
+    suspend fun clearOtpData(documentId: String): Result<Boolean> {
+        return try {
+            collection.document(documentId)
+                .update("otp", com.google.firebase.firestore.FieldValue.delete())
+                .await()
+            Result.success(true)
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }

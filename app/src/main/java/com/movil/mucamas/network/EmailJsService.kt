@@ -2,59 +2,61 @@ package com.movil.mucamas.network
 
 import android.util.Log
 import com.movil.mucamas.config.EmailJsConfig
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
+import com.movil.mucamas.data.model.EmailJsRequest
+import com.movil.mucamas.data.model.TemplateParams
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
 object EmailJsService {
 
-    private const val API_URL = "https://api.emailjs.com/api/v1.0/email/send"
+    private const val BASE_URL = "https://api.mailersend.com/"
+
+    // Configuración del Logcat para ver las peticiones
+    private val logging = HttpLoggingInterceptor().apply {
+        level = HttpLoggingInterceptor.Level.BODY
+    }
+
+    private val client = OkHttpClient.Builder()
+        .addInterceptor(logging)
+        .build()
+
+    // Inicialización de Retrofit
+    private val retrofitApi: EmailJsApi by lazy {
+        Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(EmailJsApi::class.java)
+    }
 
     /**
      * Envía un OTP al email especificado usando la API de EmailJS.
-     * Debe ser llamada desde una corrutina.
-     *
-     * @param email La dirección de email del destinatario.
-     * @param otp El código OTP a enviar.
-     * @return true si el email se envió correctamente, false en caso contrario.
      */
     suspend fun sendOtpEmail(email: String, otp: String): Boolean {
-        if (EmailJsConfig.SERVICE_ID.contains("YOUR_")) {
-            Log.e("EmailJsService", "Credenciales de EmailJS no configuradas.")
-            return false
-        }
+        val payload = EmailJsRequest(
+            service_id = EmailJsConfig.SERVICE_ID,
+            template_id = EmailJsConfig.TEMPLATE_ID,
+            user_id = EmailJsConfig.API_TOKEN,
+            template_params = TemplateParams(email, otp,"")
+        )
 
-        return withContext(Dispatchers.IO) {
-            try {
-                val url = URL(API_URL)
-                val conn = url.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("Content-Type", "application/json")
-                conn.doOutput = true
+        return try {
+            val response = retrofitApi.sendEmail(payload)
 
-                val templateParams = JSONObject().apply {
-                    put("to_email", email)
-                    put("otp_code", otp)
-                }
-                val jsonPayload = JSONObject().apply {
-                    put("service_id", EmailJsConfig.SERVICE_ID)
-                    put("template_id", EmailJsConfig.TEMPLATE_ID)
-                    put("user_id", EmailJsConfig.PUBLIC_KEY)
-                    put("template_params", templateParams)
-                }
-
-                OutputStreamWriter(conn.outputStream).use { it.write(jsonPayload.toString()) }
-
-                val responseCode = conn.responseCode
-                Log.d("EmailJsService", "EmailJS Response: $responseCode")
-                responseCode == HttpURLConnection.HTTP_OK
-            } catch (e: Exception) {
-                Log.e("EmailJsService", "Error enviando email con EmailJS", e)
+            if (response.isSuccessful) {
+                Log.d("EmailJsService", "Email enviado con éxito")
+                true
+            } else {
+                // Como QA, aquí verás el error exacto (ej. 401 si el user_id está mal)
+                Log.e("EmailJsService", "Error en la respuesta: ${response.code()} - ${response.errorBody()?.string()}")
                 false
             }
+        } catch (e: Exception) {
+            Log.e("EmailJsService", "Fallo crítico en la petición", e)
+            false
         }
     }
 }

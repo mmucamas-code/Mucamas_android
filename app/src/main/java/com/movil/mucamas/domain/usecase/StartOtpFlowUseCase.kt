@@ -1,56 +1,55 @@
 package com.movil.mucamas.domain.usecase
 
+import android.content.Context
 import android.util.Log
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
 import com.movil.mucamas.network.EmailJsService
+import com.movil.mucamas.ui.repositories.UserRepository
 import com.movil.mucamas.ui.utils.OtpManager
-import kotlinx.coroutines.tasks.await
 
-// 1. Sealed class para representar los resultados del flujo
 sealed class StartOtpFlowResult {
     object Success : StartOtpFlowResult()
     sealed class Error(val message: String) : StartOtpFlowResult() {
         object UserNotFound : Error("El usuario no existe en la base de datos.")
         object OtpGenerationError : Error("No se pudo generar y guardar el código OTP.")
         object EmailSendError : Error("No se pudo enviar el correo con el código.")
-        data class UnknownError(val exception: Exception) :
-            Error("Ocurrió un error inesperado.")
+        // 1. Corregido para aceptar cualquier tipo de Throwable
+        data class UnknownError(val exception: Throwable) : Error("Ocurrió un error inesperado.")
     }
 }
 
-// 2. Caso de uso para encapsular la lógica
-class StartOtpFlowUseCase {
+class StartOtpFlowUseCase(
+    private val userRepository: UserRepository = UserRepository() // Inyectamos el repositorio
+) {
 
-    /**
-     * Orquesta el flujo completo de inicio de sesión con OTP.
-     * @param userId El ID del usuario (documento en Firestore).
-     * @return Un [StartOtpFlowResult] que indica el éxito o el tipo de error.
-     */
-    suspend operator fun invoke(userId: String): StartOtpFlowResult {
+    suspend operator fun invoke(context: Context,userId: String): StartOtpFlowResult {
         return try {
-            // Paso 1: Verificar que el usuario existe y obtener su email
-            val userDocument = Firebase.firestore.collection("users").document(userId).get().await()
-            if (!userDocument.exists()) {
-                return StartOtpFlowResult.Error.UserNotFound
+            // Paso 1: Verificar que el usuario existe usando el repositorio
+            val userResult = userRepository.findUserByIdNumber(userId)
+
+            // 2. Bloque de fallo corregido
+            if (userResult.isFailure) {
+                // Si isFailure es true, exceptionOrNull() no será null.
+                return StartOtpFlowResult.Error.UnknownError(userResult.exceptionOrNull()!!)
             }
-            val userEmail = userDocument.getString("email")
-            if (userEmail.isNullOrBlank()) {
-                // Si el email no existe en el documento, no podemos continuar.
+
+            val user = userResult.getOrNull()
+            if (user == null || user.email.isBlank()) {
                 return StartOtpFlowResult.Error.UserNotFound
             }
 
             // Paso 2: Generar y guardar el OTP en Firestore
-            val generatedOtp = OtpManager.generateAndSaveOtp(userId)
+            // El idNumber (userId) sigue siendo la clave para el documento OTP
+            val generatedOtp = OtpManager.generateAndSaveOtp(user.documentId)
             if (generatedOtp.isBlank()) {
                 return StartOtpFlowResult.Error.OtpGenerationError
             }
 
-            // Paso 3: Enviar el OTP por email usando EmailJS
-            val emailSent = EmailJsService.sendOtpEmail(userEmail, generatedOtp)
-            if (!emailSent) {
-                return StartOtpFlowResult.Error.EmailSendError
-            }
+            // TODO:  Paso 3 -> Enviar el OTP por email usando EmailJS (PENDING)
+            //val emailSent = EmailJsService.sendOtpEmail(user.email, generatedOtp)
+            //if (!emailSent) {
+            //    return StartOtpFlowResult.Error.EmailSendError
+            //}
+            OtpManager.generateAndNotifyOtp(context = context,generatedOtp)
 
             StartOtpFlowResult.Success
         } catch (e: Exception) {
