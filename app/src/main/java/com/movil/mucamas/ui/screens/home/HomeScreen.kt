@@ -112,70 +112,75 @@ fun HomeScreen(
         }
     }
 
-    LazyColumn(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = spacing.large),
-        verticalArrangement = Arrangement.Top
+            .padding(horizontal = spacing.large)
     ) {
-        item {
-            Spacer(modifier = Modifier.height(spacing.extraLarge))
-            HeaderSection(userName = userLogged?.fullName?.substringBefore(" ") ?: "Usuario")
-            Spacer(modifier = Modifier.height(spacing.extraLarge))
-        }
+        Spacer(modifier = Modifier.height(spacing.extraLarge))
+        HeaderSection(userName = userLogged?.fullName?.substringBefore(" ") ?: "Usuario")
+        Spacer(modifier = Modifier.height(spacing.extraLarge))
 
-        if (userLogged?.role == UserRole.ADMIN) {
-            item {
-                Button(onClick = { filePickerLauncher.launch("application/json") }) {
-                    Text("Cargar servicios desde JSON")
-                }
-                Spacer(modifier = Modifier.height(spacing.large))
-            }
-        }
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.Top
+        ) {
 
-        item {
-            when (val state = servicesUiState) {
-                is ServicesUiState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = spacing.extraLarge),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            if (userLogged?.role == UserRole.ADMIN) {
+                item {
+                    Button(onClick = { filePickerLauncher.launch("application/json") }) {
+                        Text("Cargar servicios desde JSON")
                     }
+                    Spacer(modifier = Modifier.height(spacing.large))
                 }
-                is ServicesUiState.Success -> {
-                    Column {
-                        for (service in state.services) {
-                            ServiceListCard(
-                                service = service,
-                                onClick = { selectedService = service }
-                            )
-                            Spacer(modifier = Modifier.height(spacing.medium))
+            }
+
+            item {
+                when (val state = servicesUiState) {
+                    is ServicesUiState.Loading -> {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = spacing.extraLarge),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                         }
                     }
-                }
-                is ServicesUiState.Empty -> {
-                    Text(
-                        "No hay servicios disponibles.",
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(spacing.extraLarge)
-                    )
-                }
-                is ServicesUiState.Error -> {
-                    Text(
-                        "Error: ${state.message}",
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(spacing.extraLarge)
-                    )
+                    is ServicesUiState.Success -> {
+                        Column {
+                            for (service in state.services) {
+                                ServiceListCard(
+                                    service = service,
+                                    onClick = { selectedService = service }
+                                )
+                                Spacer(modifier = Modifier.height(spacing.medium))
+                            }
+                        }
+                    }
+                    is ServicesUiState.Empty -> {
+                        Text(
+                            "No hay servicios disponibles.",
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(spacing.extraLarge)
+                        )
+                    }
+                    is ServicesUiState.Error -> {
+                        Text(
+                            "Error: ${state.message}",
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(spacing.extraLarge)
+                        )
+                    }
                 }
             }
-        }
 
-        item {
-            Spacer(modifier = Modifier.height(80.dp))
+            item {
+                Spacer(modifier = Modifier.height(80.dp))
+            }
         }
     }
+
+
 
     if (selectedService != null) {
         ModalBottomSheet(
