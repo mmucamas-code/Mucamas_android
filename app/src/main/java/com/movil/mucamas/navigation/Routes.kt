@@ -13,6 +13,7 @@ sealed class Screen(val route: String) {
     data object MyReservations : Screen("my_reservations")
     data object RateService : Screen("rate_service")
     data object Profile : Screen("profile")
+    data object AdminServices : Screen("admin_services") // Nueva ruta
 
     fun Screen.SelectService.createRoute(serviceName: String): String {
         return "select_service/$serviceName"

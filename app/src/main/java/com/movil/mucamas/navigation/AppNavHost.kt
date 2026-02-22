@@ -12,6 +12,7 @@ import com.movil.mucamas.ui.components.BottomNavItem
 import com.movil.mucamas.ui.screens.MainScreen
 import com.movil.mucamas.ui.screens.SplashScreen
 import com.movil.mucamas.ui.screens.WelcomeScreen
+import com.movil.mucamas.ui.screens.admin.AdminServicesScreen
 import com.movil.mucamas.ui.screens.login.LoginScreen
 import com.movil.mucamas.ui.screens.login.RegisterIdentityScreen
 import com.movil.mucamas.ui.screens.reservation.SelectServiceScreen
@@ -97,7 +98,9 @@ fun AppNavHost(
             )
         }
 
-        // Aquí irían las pantallas que se abren POR ENCIMA del MainScreen
-        // Ejemplo: composable("service_detail/{serviceId}") { ... }
+        // Pantalla de administración, que se abre sobre el grafo principal
+        composable(Screen.AdminServices.route) {
+            AdminServicesScreen()
+        }
     }
 }

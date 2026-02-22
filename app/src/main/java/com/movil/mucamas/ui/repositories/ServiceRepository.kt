@@ -36,7 +36,6 @@ class ServiceRepository {
 
         val serviceDocument = snapshot.documents.firstOrNull()
         val serviceObject = serviceDocument?.toObject(Service::class.java)
-        serviceObject?.updateId(serviceDocument?.id)
         Log.d("Session", "Service: $serviceObject")
         return serviceObject
     }

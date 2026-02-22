@@ -1,8 +1,6 @@
+
 package com.movil.mucamas.ui.screens.home
 
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -42,7 +40,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -53,11 +50,8 @@ import com.movil.mucamas.data.model.UserSession
 import com.movil.mucamas.ui.models.Service
 import com.movil.mucamas.ui.models.UserRole
 import com.movil.mucamas.ui.utils.AdaptiveTheme
-import com.movil.mucamas.ui.utils.FormatsHelpers.formatCurrencyCOP
-import com.movil.mucamas.ui.utils.FormatsHelpers.formatDuration
 import com.movil.mucamas.ui.utils.FirebaseHelpers.getServiceIcon
-import com.movil.mucamas.ui.viewmodels.AdminUiEvent
-import com.movil.mucamas.ui.viewmodels.AdminViewModel
+import com.movil.mucamas.ui.utils.FormatsHelpers
 import com.movil.mucamas.ui.viewmodels.HomeViewModel
 import com.movil.mucamas.ui.viewmodels.MainViewModel
 import com.movil.mucamas.ui.viewmodels.ServicesUiState
@@ -66,9 +60,9 @@ import com.movil.mucamas.ui.viewmodels.ServicesUiState
 @Composable
 fun HomeScreen(
     onServiceClick: (String) -> Unit = {},
+    onAdminClick: () -> Unit = {},
     mainViewModel: MainViewModel = viewModel(),
-    homeViewModel: HomeViewModel = viewModel(),
-    adminViewModel: AdminViewModel = viewModel()
+    homeViewModel: HomeViewModel = viewModel()
 ) {
     val spacing = AdaptiveTheme.spacing
     val sessionState by mainViewModel.sessionState.collectAsState()
@@ -78,39 +72,17 @@ fun HomeScreen(
     var selectedService by remember { mutableStateOf<Service?>(null) }
     val sheetState = rememberModalBottomSheetState()
 
-    val context = LocalContext.current
-    val contentResolver = context.contentResolver
-
-    val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-        onResult = { uri ->
-            if (uri != null) {
-                adminViewModel.loadServicesFromJson(uri, contentResolver)
-            }
-        }
-    )
-
     LaunchedEffect(sessionState) {
-        when (val result = sessionState) {
-            is SessionResult.Success -> { userLogged = result.user }
-            is SessionResult.Empty -> { /* No user logged in */ }
-            is SessionResult.Loading -> { /* Loading session */ }
+        if (sessionState is SessionResult.Success) {
+            userLogged = (sessionState as SessionResult.Success).user
         }
     }
 
-    LaunchedEffect(key1 = true) {
-        adminViewModel.eventFlow.collect { event ->
-            when (event) {
-                is AdminUiEvent.ShowError -> {
-                    Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
-                }
-                is AdminUiEvent.ServicesLoaded -> {
-                    Toast.makeText(context, "Servicios cargados con éxito", Toast.LENGTH_SHORT).show()
-                    homeViewModel.refreshServices()
-                }
-            }
-        }
+    // cargamos los servicios
+    LaunchedEffect(Unit) {
+        homeViewModel.refreshServices()
     }
+
 
     Column(
         modifier = Modifier
@@ -125,11 +97,10 @@ fun HomeScreen(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.Top
         ) {
-
             if (userLogged?.role == UserRole.ADMIN) {
                 item {
-                    Button(onClick = { filePickerLauncher.launch("application/json") }) {
-                        Text("Cargar servicios desde JSON")
+                    Button(onClick = onAdminClick) {
+                        Text("Administrar servicios")
                     }
                     Spacer(modifier = Modifier.height(spacing.large))
                 }
@@ -179,8 +150,6 @@ fun HomeScreen(
             }
         }
     }
-
-
 
     if (selectedService != null) {
         ModalBottomSheet(
@@ -324,13 +293,13 @@ fun ServiceDetailContent(
         // Unir Precio y Duración
         Row {
             Text(
-                text = formatCurrencyCOP(service.precio),
+                text = FormatsHelpers.formatCurrencyCOP(service.precio),
                 style = MaterialTheme.typography.titleLarge.copy(fontSize = typography.title, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary),
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.width(spacing.small))
             Text(
-                text = "(${formatDuration(service.duracionMinutos.toInt())})",
+                text = "(${FormatsHelpers.formatDuration(service.duracionMinutos.toInt())})",
                 style = MaterialTheme.typography.titleMedium.copy(fontSize = typography.title, color = MaterialTheme.colorScheme.onSurfaceVariant),
                 textAlign = TextAlign.Center
             )

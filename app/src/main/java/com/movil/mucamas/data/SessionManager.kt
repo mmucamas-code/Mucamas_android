@@ -31,6 +31,7 @@ class SessionManager(private val context: Context) {
     // Guarda la sesión del usuario
     suspend fun saveUserSession(session: UserSession) {
         context.dataStore.edit {
+            it[DOCUMENT_ID] = session.documentId
             it[USER_ID] = session.userId
             it[FULL_NAME] = session.fullName
             it[ID_NUMBER] = session.idNumber

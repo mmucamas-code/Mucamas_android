@@ -84,6 +84,9 @@ fun MainScreen(navController: NavController) {
                 BottomNavItem.Home -> HomeScreen(
                     onServiceClick = { serviceName ->
                         navController.navigate(Screen.SelectService.createRoute(serviceName))
+                    },
+                    onAdminClick = {
+                        navController.navigate(Screen.AdminServices.route)
                     }
                 )
 
