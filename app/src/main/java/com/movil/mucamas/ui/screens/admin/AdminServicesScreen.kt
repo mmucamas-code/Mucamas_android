@@ -10,6 +10,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,7 +30,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,6 +39,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -70,7 +72,7 @@ fun AdminServicesScreen(adminViewModel: AdminViewModel = viewModel()) {
     val context = LocalContext.current
 
     var serviceToEdit by remember { mutableStateOf<Service?>(null) }
-    val editSheetState = rememberModalBottomSheetState()
+    val editSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val csvPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -92,12 +94,14 @@ fun AdminServicesScreen(adminViewModel: AdminViewModel = viewModel()) {
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { csvPickerLauncher.launch("text/csv") },
-                containerColor = MaterialTheme.colorScheme.primary
+                containerColor = MaterialTheme.colorScheme.onSurface, // Black
+                contentColor = MaterialTheme.colorScheme.surface // White
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Importar CSV", tint = MaterialTheme.colorScheme.onPrimary)
+                Icon(Icons.Default.Add, contentDescription = "Importar CSV")
             }
         }
     ) { paddingValues ->
@@ -122,7 +126,8 @@ fun AdminServicesScreen(adminViewModel: AdminViewModel = viewModel()) {
     if (serviceToEdit != null) {
         ModalBottomSheet(
             onDismissRequest = { serviceToEdit = null },
-            sheetState = editSheetState
+            sheetState = editSheetState,
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
             EditServiceSheetContent(
                 service = serviceToEdit!!,
@@ -137,7 +142,7 @@ fun AdminServicesScreen(adminViewModel: AdminViewModel = viewModel()) {
 fun AdminServicesContent(uiState: AdminUiState, viewModel: AdminViewModel, onEditClick: (Service) -> Unit) {
     if (uiState.isLoading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.onSurface)
         }
     } else {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -152,16 +157,17 @@ fun AdminServicesContent(uiState: AdminUiState, viewModel: AdminViewModel, onEdi
 fun ServiceListItem(service: Service, viewModel: AdminViewModel, onEditClick: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
 
-    Card(
+    OutlinedCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { expanded = !expanded },
-        elevation = CardDefaults.cardElevation(2.dp)
+        colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(service.nombre, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                Text(FormatsHelpers.formatCurrencyCOP(service.precio), fontWeight = FontWeight.SemiBold)
+                Text(service.nombre, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(FormatsHelpers.formatCurrencyCOP(service.precio), fontWeight = FontWeight.Medium)
             }
 
             AnimatedVisibility(
@@ -193,11 +199,11 @@ fun ServiceDetails(service: Service, viewModel: AdminViewModel, onEditClick: () 
         Spacer(modifier = Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
             IconButton(onClick = onEditClick) {
-                Icon(Icons.Default.Edit, contentDescription = "Editar")
+                Icon(Icons.Default.Edit, contentDescription = "Editar", tint = MaterialTheme.colorScheme.onSurface)
             }
             Spacer(modifier = Modifier.width(8.dp))
             IconButton(onClick = { viewModel.deleteService(service.id, service.nombre) }) {
-                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
             }
         }
     }
@@ -222,7 +228,7 @@ fun EditServiceSheetContent(
             .padding(horizontal = 16.dp, vertical = 24.dp)
     ) {
         item {
-            Text("Editar Servicio", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("Editar Servicio", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(modifier = Modifier.height(16.dp))
         }
 
@@ -248,15 +254,15 @@ fun EditServiceSheetContent(
         }
 
         item {
-            Text("Características", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text("Características", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
             Spacer(modifier = Modifier.height(8.dp))
         }
 
         items(caracteristicas) { item ->
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
-                Text(item, modifier = Modifier.weight(1f))
+                Text(item, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
                 IconButton(onClick = { caracteristicas.remove(item) }) {
-                    Icon(Icons.Default.Delete, contentDescription = "Eliminar característica", tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Default.Delete, contentDescription = "Eliminar característica", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
                 }
             }
         }
@@ -270,12 +276,18 @@ fun EditServiceSheetContent(
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = {
-                    if (newCaracteristica.isNotBlank()) {
-                        caracteristicas.add(newCaracteristica)
-                        newCaracteristica = ""
-                    }
-                }) {
+                Button(
+                    onClick = {
+                        if (newCaracteristica.isNotBlank()) {
+                            caracteristicas.add(newCaracteristica)
+                            newCaracteristica = ""
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.onSurface,
+                        contentColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
                     Text("Añadir")
                 }
             }
@@ -295,7 +307,11 @@ fun EditServiceSheetContent(
                     adminViewModel.updateService(updatedService)
                     onDismiss()
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.onSurface,
+                    contentColor = MaterialTheme.colorScheme.surface
+                )
             ) {
                 Text("Guardar Cambios")
             }
@@ -314,7 +330,6 @@ fun MucamasTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
-        modifier = Modifier.fillMaxWidth(),
-        keyboardOptions = keyboardOptions
+        modifier = Modifier.fillMaxWidth()
     )
 }

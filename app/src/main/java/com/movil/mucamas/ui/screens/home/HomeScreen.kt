@@ -30,6 +30,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +47,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -76,7 +79,7 @@ fun HomeScreen(
     var userLogged by remember { mutableStateOf<UserSession?>(null) }
 
     var selectedService by remember { mutableStateOf<Service?>(null) }
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var searchQuery by remember { mutableStateOf("") }
     val categories = listOf("Todos", "Hogar", "Oficina", "Cocina", "Adicionales")
@@ -88,12 +91,10 @@ fun HomeScreen(
         }
     }
 
-    // Carga inicial de servicios
     LaunchedEffect(Unit) {
         homeViewModel.refreshServices()
     }
 
-    // Lógica de filtrado en el scope correcto del Composable
     val filteredServices = remember(searchQuery, selectedCategory, servicesUiState) {
         if (servicesUiState is ServicesUiState.Success) {
             (servicesUiState as ServicesUiState.Success).services.filter {
@@ -108,8 +109,10 @@ fun HomeScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Contenido principal con scroll
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .background(MaterialTheme.colorScheme.surface))
+    {
         LazyColumn(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(bottom = spacing.large)
@@ -140,7 +143,6 @@ fun HomeScreen(
                 }
             }
 
-            // Renderizado de la UI basado en el estado
             when (val state = servicesUiState) {
                 is ServicesUiState.Loading -> {
                     item {
@@ -211,7 +213,6 @@ fun HomeScreen(
         }
     }
 
-    // Modal que se muestra al seleccionar un servicio
     if (selectedService != null) {
         ModalBottomSheet(
             onDismissRequest = { selectedService = null },
@@ -236,8 +237,8 @@ fun SearchBar(searchQuery: String, onQueryChange: (String) -> Unit) {
         onValueChange = onQueryChange,
         modifier = Modifier.fillMaxWidth(),
         placeholder = { Text("¿Qué necesitas limpiar hoy?") },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
-        shape = RoundedCornerShape(50) // Bordes redondeados
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar", tint = MaterialTheme.colorScheme.onSurface) },
+        shape = RoundedCornerShape(50)
     )
 }
 
@@ -251,7 +252,22 @@ fun CategoryFilters(categories: List<String>, selectedCategory: String, onCatego
             FilterChip(
                 selected = category == selectedCategory,
                 onClick = { onCategorySelected(category) },
-                label = { Text(category) }
+                label = { Text(category) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.onSurface,
+                    selectedLabelColor = MaterialTheme.colorScheme.surface,
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                    selectedBorderColor = Color.Transparent,
+                    disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
+                    disabledSelectedBorderColor = Color.Transparent,
+                    borderWidth = 1.dp,
+                    selectedBorderWidth = 1.dp,
+                    enabled = true,
+                    selected =  category == selectedCategory
+                )
             )
         }
     }
@@ -263,18 +279,25 @@ fun ComboCard(service: Service, onClick: () -> Unit) {
         modifier = Modifier
             .width(200.dp)
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        elevation = CardDefaults.cardElevation(2.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(100.dp)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                Color.Transparent
+                            )
+                        )
+                    ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(getServiceIcon(service.icono), contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+                Icon(getServiceIcon(service.icono), contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurface)
             }
             Column(modifier = Modifier.padding(AdaptiveTheme.spacing.medium)) {
                 Text(service.nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
@@ -283,7 +306,7 @@ fun ComboCard(service: Service, onClick: () -> Unit) {
                     FormatsHelpers.formatCurrencyCOP(service.precio),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         }
@@ -308,7 +331,7 @@ fun IndividualServiceCard(service: Service, onClick: () -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                Icon(getServiceIcon(service.icono), contentDescription = service.nombre, tint = MaterialTheme.colorScheme.primary)
+                Icon(getServiceIcon(service.icono), contentDescription = service.nombre, tint = MaterialTheme.colorScheme.onSurface)
                 Spacer(modifier = Modifier.width(AdaptiveTheme.spacing.medium))
                 Text(service.nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
@@ -342,19 +365,18 @@ fun ServiceDetailContent(service: Service, onReserveClick: () -> Unit) {
             .padding(horizontal = spacing.large)
             .padding(bottom = spacing.extraLarge + 20.dp),
     ) {
-        // Encabezado con ícono y nombre
         Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
                 modifier = Modifier
                     .size(80.dp)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = getServiceIcon(service.icono),
                     contentDescription = null,
                     modifier = Modifier.size(40.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = MaterialTheme.colorScheme.onSurface
                 )
             }
             Spacer(modifier = Modifier.height(spacing.medium))
@@ -365,11 +387,10 @@ fun ServiceDetailContent(service: Service, onReserveClick: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(spacing.small))
 
-            // Fila para Precio y Duración
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = FormatsHelpers.formatCurrencyCOP(service.precio),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 )
                 Spacer(modifier = Modifier.width(spacing.small))
                 Text(
@@ -383,12 +404,10 @@ fun ServiceDetailContent(service: Service, onReserveClick: () -> Unit) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
         Spacer(modifier = Modifier.height(spacing.large))
 
-        // Descripción
         Text(text = service.descripcion, style = MaterialTheme.typography.bodyLarge, lineHeight = 24.sp)
 
         Spacer(modifier = Modifier.height(spacing.large))
 
-        // Lista de Características
         Text("Incluye:", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
         Spacer(modifier = Modifier.height(spacing.medium))
         Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
@@ -397,7 +416,7 @@ fun ServiceDetailContent(service: Service, onReserveClick: () -> Unit) {
                     Icon(
                         Icons.Default.CheckCircle,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(spacing.medium))
@@ -408,20 +427,18 @@ fun ServiceDetailContent(service: Service, onReserveClick: () -> Unit) {
 
         Spacer(modifier = Modifier.height(spacing.extraLarge))
 
-        // Botón de Reserva
         Button(
             onClick = onReserveClick,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(dimens.buttonHeight),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.onSurface, // Black
+                contentColor = MaterialTheme.colorScheme.surface // White
+            ),
             shape = RoundedCornerShape(dimens.cornerRadius)
         ) {
-            Text(
-                text = "Reservar este servicio",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold
-            )
+            Text("Reservar este servicio", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         }
     }
 }
