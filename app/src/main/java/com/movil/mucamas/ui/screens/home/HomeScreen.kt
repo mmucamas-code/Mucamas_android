@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,20 +16,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -72,85 +78,140 @@ fun HomeScreen(
     var selectedService by remember { mutableStateOf<Service?>(null) }
     val sheetState = rememberModalBottomSheetState()
 
+    var searchQuery by remember { mutableStateOf("") }
+    val categories = listOf("Todos", "Hogar", "Oficina", "Cocina", "Adicionales")
+    var selectedCategory by remember { mutableStateOf(categories.first()) }
+
     LaunchedEffect(sessionState) {
         if (sessionState is SessionResult.Success) {
             userLogged = (sessionState as SessionResult.Success).user
         }
     }
 
-    // cargamos los servicios
+    // Carga inicial de servicios
     LaunchedEffect(Unit) {
         homeViewModel.refreshServices()
     }
 
+    // Lógica de filtrado en el scope correcto del Composable
+    val filteredServices = remember(searchQuery, selectedCategory, servicesUiState) {
+        if (servicesUiState is ServicesUiState.Success) {
+            (servicesUiState as ServicesUiState.Success).services.filter {
+                val matchesCategory = selectedCategory == "Todos" || it.categoria.equals(selectedCategory, ignoreCase = true)
+                val matchesSearch = searchQuery.isBlank() ||
+                        it.nombre.contains(searchQuery, ignoreCase = true) ||
+                        it.descripcion.contains(searchQuery, ignoreCase = true)
+                matchesCategory && matchesSearch
+            }
+        } else {
+            emptyList()
+        }
+    }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = spacing.large)
-    ) {
-        Spacer(modifier = Modifier.height(spacing.extraLarge))
-        HeaderSection(userName = userLogged?.fullName?.substringBefore(" ") ?: "Usuario")
-        Spacer(modifier = Modifier.height(spacing.extraLarge))
-
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Contenido principal con scroll
         LazyColumn(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.Top
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(bottom = spacing.large)
         ) {
+            item {
+                Column(modifier = Modifier.padding(horizontal = spacing.large)) {
+                    Spacer(modifier = Modifier.height(spacing.extraLarge))
+                    HeaderSection(userName = userLogged?.fullName?.substringBefore(" ") ?: "Usuario")
+                    Spacer(modifier = Modifier.height(spacing.large))
+                    SearchBar(searchQuery = searchQuery, onQueryChange = { searchQuery = it })
+                }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(spacing.medium))
+                CategoryFilters(categories, selectedCategory, onCategorySelected = { selectedCategory = it })
+                Spacer(modifier = Modifier.height(spacing.large))
+            }
+
             if (userLogged?.role == UserRole.ADMIN) {
                 item {
-                    Button(onClick = onAdminClick) {
-                        Text("Administrar servicios")
+                    Box(modifier = Modifier.padding(horizontal = spacing.large)){
+                        Button(onClick = onAdminClick) {
+                            Text("Administrar servicios")
+                        }
                     }
                     Spacer(modifier = Modifier.height(spacing.large))
                 }
             }
 
-            item {
-                when (val state = servicesUiState) {
-                    is ServicesUiState.Loading -> {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = spacing.extraLarge),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            // Renderizado de la UI basado en el estado
+            when (val state = servicesUiState) {
+                is ServicesUiState.Loading -> {
+                    item {
+                        Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
                         }
                     }
-                    is ServicesUiState.Success -> {
-                        Column {
-                            for (service in state.services) {
-                                ServiceListCard(
-                                    service = service,
-                                    onClick = { selectedService = service }
-                                )
-                                Spacer(modifier = Modifier.height(spacing.medium))
+                }
+                is ServicesUiState.Success -> {
+                    val comboServices = filteredServices.filter { it.esCombo }
+                    val individualServices = filteredServices.filter { !it.esCombo }
+
+                    if (comboServices.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Combos para ti",
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                modifier = Modifier.padding(horizontal = spacing.large)
+                            )
+                            Spacer(modifier = Modifier.height(spacing.medium))
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = spacing.large),
+                                horizontalArrangement = Arrangement.spacedBy(spacing.medium)
+                            ) {
+                                items(comboServices) { service ->
+                                    ComboCard(service = service, onClick = { selectedService = service })
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(spacing.large))
+                        }
+                    }
+
+                    if (individualServices.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Servicios",
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                modifier = Modifier.padding(horizontal = spacing.large)
+                            )
+                            Spacer(modifier = Modifier.height(spacing.medium))
+                        }
+                        items(individualServices) {
+                            service ->
+                            Box(modifier = Modifier.padding(horizontal = spacing.large, vertical = spacing.small)){
+                                IndividualServiceCard(service = service, onClick = { selectedService = service })
                             }
                         }
                     }
-                    is ServicesUiState.Empty -> {
+                }
+                is ServicesUiState.Empty -> {
+                    item {
                         Text(
                             "No hay servicios disponibles.",
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth().padding(spacing.extraLarge)
+                            modifier = Modifier.padding(all = spacing.extraLarge), textAlign = TextAlign.Center
                         )
                     }
-                    is ServicesUiState.Error -> {
+                }
+                is ServicesUiState.Error -> {
+                    item {
                         Text(
                             "Error: ${state.message}",
                             color = MaterialTheme.colorScheme.error,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth().padding(spacing.extraLarge)
+                            modifier = Modifier.padding(all = spacing.extraLarge), textAlign = TextAlign.Center
                         )
                     }
                 }
             }
-
-            item {
-                Spacer(modifier = Modifier.height(80.dp))
-            }
         }
     }
 
+    // Modal que se muestra al seleccionar un servicio
     if (selectedService != null) {
         ModalBottomSheet(
             onDismissRequest = { selectedService = null },
@@ -169,163 +230,196 @@ fun HomeScreen(
 }
 
 @Composable
-fun HeaderSection(userName: String) {
-    val typography = AdaptiveTheme.typography
-    val spacing = AdaptiveTheme.spacing
-
-    Column {
-        Text(
-            text = "Hola, $userName!",
-            style = MaterialTheme.typography.titleLarge.copy(
-                fontSize = typography.title,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-            )
-        )
-        Spacer(modifier = Modifier.height(spacing.small))
-        Text(
-            text = "¿Qué necesitas hoy?",
-            style = MaterialTheme.typography.displaySmall.copy(
-                fontSize = typography.headline,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-        )
-    }
+fun SearchBar(searchQuery: String, onQueryChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = searchQuery,
+        onValueChange = onQueryChange,
+        modifier = Modifier.fillMaxWidth(),
+        placeholder = { Text("¿Qué necesitas limpiar hoy?") },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
+        shape = RoundedCornerShape(50) // Bordes redondeados
+    )
 }
 
 @Composable
-fun ServiceListCard(
-    service: Service,
-    onClick: () -> Unit
-) {
-    val dimens = AdaptiveTheme.dimens
-    val spacing = AdaptiveTheme.spacing
-    val typography = AdaptiveTheme.typography
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(dimens.cornerRadius),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+fun CategoryFilters(categories: List<String>, selectedCategory: String, onCategorySelected: (String) -> Unit) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = AdaptiveTheme.spacing.large),
+        horizontalArrangement = Arrangement.spacedBy(AdaptiveTheme.spacing.small)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(spacing.medium),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(dimens.iconLarge)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = getServiceIcon(service.icono),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(dimens.iconSmall)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(spacing.medium))
-
-                Text(
-                    text = service.nombre,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontSize = typography.title,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-            }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        items(categories) { category ->
+            FilterChip(
+                selected = category == selectedCategory,
+                onClick = { onCategorySelected(category) },
+                label = { Text(category) }
             )
         }
     }
 }
 
 @Composable
-fun ServiceDetailContent(
-    service: Service,
-    onReserveClick: () -> Unit
-) {
+fun ComboCard(service: Service, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .width(200.dp)
+            .clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(getServiceIcon(service.icono), contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+            }
+            Column(modifier = Modifier.padding(AdaptiveTheme.spacing.medium)) {
+                Text(service.nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+                Spacer(modifier = Modifier.height(AdaptiveTheme.spacing.small))
+                Text(
+                    FormatsHelpers.formatCurrencyCOP(service.precio),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun IndividualServiceCard(service: Service, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(AdaptiveTheme.dimens.cornerRadius),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(AdaptiveTheme.spacing.medium),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Icon(getServiceIcon(service.icono), contentDescription = service.nombre, tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(AdaptiveTheme.spacing.medium))
+                Text(service.nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
+            Text(FormatsHelpers.formatCurrencyCOP(service.precio), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
+fun HeaderSection(userName: String) {
+    Column {
+        Text(
+            text = "Hola, $userName!",
+            style = MaterialTheme.typography.titleLarge.copy(color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f))
+        )
+        Text(
+            text = "¿Qué necesitas hoy?",
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+        )
+    }
+}
+
+@Composable
+fun ServiceDetailContent(service: Service, onReserveClick: () -> Unit) {
     val spacing = AdaptiveTheme.spacing
     val dimens = AdaptiveTheme.dimens
-    val typography = AdaptiveTheme.typography
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = spacing.large)
             .padding(bottom = spacing.extraLarge + 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier.size(80.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = getServiceIcon(service.icono),
-                contentDescription = null,
-                modifier = Modifier.size(40.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-        }
-
-        Spacer(modifier = Modifier.height(spacing.medium))
-
-        Text(
-            text = service.nombre,
-            style = MaterialTheme.typography.headlineMedium.copy(fontSize = typography.headline, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface),
-            textAlign = TextAlign.Center
-        )
-
-        Spacer(modifier = Modifier.height(spacing.small))
-
-        // Unir Precio y Duración
-        Row {
+        // Encabezado con ícono y nombre
+        Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = getServiceIcon(service.icono),
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(modifier = Modifier.height(spacing.medium))
             Text(
-                text = FormatsHelpers.formatCurrencyCOP(service.precio),
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = typography.title, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary),
+                text = service.nombre,
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.width(spacing.small))
-            Text(
-                text = "(${FormatsHelpers.formatDuration(service.duracionMinutos.toInt())})",
-                style = MaterialTheme.typography.titleMedium.copy(fontSize = typography.title, color = MaterialTheme.colorScheme.onSurfaceVariant),
-                textAlign = TextAlign.Center
-            )
+            Spacer(modifier = Modifier.height(spacing.small))
+
+            // Fila para Precio y Duración
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = FormatsHelpers.formatCurrencyCOP(service.precio),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                )
+                Spacer(modifier = Modifier.width(spacing.small))
+                Text(
+                    text = "(${FormatsHelpers.formatDuration(service.duracionMinutos.toInt())})",
+                    style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(spacing.large))
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
         Spacer(modifier = Modifier.height(spacing.large))
 
-        Text(
-            text = service.descripcion,
-            style = MaterialTheme.typography.bodyLarge.copy(fontSize = typography.body, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 24.sp),
-            textAlign = TextAlign.Center
-        )
+        // Descripción
+        Text(text = service.descripcion, style = MaterialTheme.typography.bodyLarge, lineHeight = 24.sp)
+
+        Spacer(modifier = Modifier.height(spacing.large))
+
+        // Lista de Características
+        Text("Incluye:", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+        Spacer(modifier = Modifier.height(spacing.medium))
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
+            service.caracteristicas.forEach { item ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(spacing.medium))
+                    Text(text = item, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(spacing.extraLarge))
 
+        // Botón de Reserva
         Button(
             onClick = onReserveClick,
-            modifier = Modifier.fillMaxWidth().height(dimens.buttonHeight),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(dimens.buttonHeight),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
             shape = RoundedCornerShape(dimens.cornerRadius)
         ) {
             Text(
-                text = "Reservar",
-                fontSize = typography.button,
+                text = "Reservar este servicio",
+                style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold
             )
         }
