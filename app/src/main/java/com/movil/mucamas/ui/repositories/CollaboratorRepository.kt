@@ -1,6 +1,9 @@
 package com.movil.mucamas.ui.repositories
 
+import android.util.Log
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import com.movil.mucamas.ui.models.Collaborator
 import com.movil.mucamas.ui.models.UserDto
 import com.movil.mucamas.ui.models.UserRole
@@ -16,43 +19,55 @@ class CollaboratorRepository {
      * Finds an available collaborator, locks them transactionally, and returns their User data.
      * This prevents race conditions where two users might be assigned the same collaborator.
      */
-    suspend fun findAndLockAvailableCollaborator(): UserDto? {
-        // Step 1: Find a few potential candidates outside the transaction.
+    suspend fun findAndLockAvailableCollaborator(): Collaborator? {
+        // PASO 1: Buscar al colaborador disponible más antiguo
         val candidatesQuery = collaboratorsCollection
             .whereEqualTo("isAvailable", true)
-            .limit(5) // Fetch a few to reduce contention
+            .orderBy("lastUpdatedAt", Query.Direction.ASCENDING)
+            .limit(1)
             .get()
             .await()
 
-        // Step 2: Iterate through candidates and try to lock one transactionally.
-        for (doc in candidatesQuery.documents) {
-            try {
-                val lockedUser = firestore.runTransaction { transaction ->
-                    val freshDoc = transaction.get(doc.reference)
-                    if (freshDoc.exists() && freshDoc.getBoolean("isAvailable") == true) {
-                        // Atomically lock the collaborator
-                        transaction.update(doc.reference, "isAvailable", false)
-                        val userId = freshDoc.getString("userId")
-                        if (userId != null) {
-                            val userDoc = transaction.get(usersCollection.document(userId))
-                            userDoc.toObject(UserDto::class.java)
-                        } else {
-                            null
-                        }
-                    } else {
-                        null // Collaborator was already locked
-                    }
-                }.await()
+        Log.d("DEBUG_COLLAB", "Documentos encontrados: ${candidatesQuery.size()}")
 
-                if (lockedUser != null) {
-                    return lockedUser // Success!
+        if (candidatesQuery.isEmpty) return null
+
+        val doc = candidatesQuery.documents.first()
+
+        return try {
+            firestore.runTransaction { transaction ->
+                // LECTURA 1: Obtener datos frescos del colaborador
+                val freshDoc = transaction.get(doc.reference)
+
+                // Verificación de seguridad
+                if (freshDoc.exists() && freshDoc.getBoolean("isAvailable") == true) {
+
+                    // Mapeamos el documento directamente a la clase Collaborator
+                    val collaboratorObject = freshDoc.toObject(Collaborator::class.java)
+
+                    if (collaboratorObject != null) {
+                        // ESCRITURA: Bloqueamos al colaborador
+                        // Usamos System.currentTimeMillis() porque tu data class espera un Long, no un ServerTimestamp de Firebase
+                        val now = System.currentTimeMillis()
+
+                        transaction.update(doc.reference,
+                            "isAvailable", false,
+                            "lastUpdatedAt", now
+                        )
+
+                        // Retornamos el objeto con los datos actualizados para la lógica local
+                        collaboratorObject.copy(isAvailable = false, lastUpdatedAt = now)
+                    } else {
+                        null
+                    }
+                } else {
+                    null
                 }
-            } catch (e: Exception) {
-                // Transaction failed, try next candidate
-                continue
-            }
+            }.await()
+        } catch (e: Exception) {
+            Log.e("FirestoreError", "Error en transacción: ${e.message}")
+            null
         }
-        return null // No collaborator could be locked
     }
 
     /**

@@ -3,6 +3,7 @@ package com.movil.mucamas.ui.screens.reservation
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -66,6 +69,7 @@ import com.movil.mucamas.ui.models.Reservation
 import com.movil.mucamas.ui.utils.FormatsHelpers
 import com.movil.mucamas.ui.viewmodels.HomeViewModel
 import com.movil.mucamas.ui.viewmodels.ReservationUiEvent
+import com.movil.mucamas.ui.viewmodels.ReservationUiState
 import com.movil.mucamas.ui.viewmodels.ReservationViewModel
 import com.movil.mucamas.ui.viewmodels.ServicesUiState
 import kotlinx.coroutines.launch
@@ -86,10 +90,9 @@ fun SelectServiceScreen(
     val reservationUiState by reservationViewModel.uiState.collectAsState()
     val context = LocalContext.current
 
-    var selectedService by remember { mutableStateOf(serviceName) }
-    val service = remember(selectedService, servicesState) {
+    val service = remember(serviceName, servicesState) {
         if (servicesState is ServicesUiState.Success) {
-            (servicesState as ServicesUiState.Success).services.find { it.nombre == selectedService }
+            (servicesState as ServicesUiState.Success).services.find { it.nombre == serviceName }
         } else null
     }
 
@@ -110,7 +113,11 @@ fun SelectServiceScreen(
         }
     }
 
-    // Event Collector for WhatsApp redirection
+    // Check availability whenever date or time changes
+    LaunchedEffect(date) {
+        reservationViewModel.checkAvailability()
+    }
+
     LaunchedEffect(Unit) {
         reservationViewModel.eventFlow.collect { event ->
             when (event) {
@@ -118,9 +125,9 @@ fun SelectServiceScreen(
                     if (event.reservationData.paymentMethod == PaymentMethod.TRANSFER) {
                         Toast.makeText(context, "Redirigiendo a WhatsApp... adjunta tu comprobante.", Toast.LENGTH_LONG).show()
                         val reservation = event.reservationData
-                        val phone = "+573209469635" // Tu número de WhatsApp
+                        val phone = "+573209469635"
                         val message = URLEncoder.encode(
-                            "Hola Mucamas, Soy ${reservation.clientName} y envío el comprobante de mi pago. \nServicio: ${reservation.serviceName}\nTotal: ${FormatsHelpers.formatCurrencyCOP(reservation.price)}.",
+                            "Hola Mucamas, Soy ${reservation.clientName}. \nEnvío el comprobante de mi pago. \nServicio: ${reservation.serviceName}\nTotal: ${FormatsHelpers.formatCurrencyCOP(reservation.price)}.",
                             "UTF-8"
                         )
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("whatsapp://send?phone=$phone&text=$message"))
@@ -158,31 +165,38 @@ fun SelectServiceScreen(
                 item { ServiceSummaryCard(service.nombre, service.precio) }
                 item { DateTimeSelector(date, { showDatePicker = true }, { showTimePicker = true }) }
                 item { AddressSelector(address, { showAddressSheet = true }) }
-                item { PaymentMethodSelector(paymentMethod, onMethodSelected = { paymentMethod = it }) }
+                item { AvailabilityStatusBox(reservationUiState) }
 
                 item {
-                    val buttonText = if (paymentMethod == PaymentMethod.TRANSFER) {
-                        "Informar pago por WhatsApp"
-                    } else {
-                        "Reservar Ahora"
+                    AnimatedVisibility(visible = reservationUiState.isCollaboratorAvailable == true) {
+                        PaymentMethodSelector(paymentMethod, onMethodSelected = { paymentMethod = it })
+                    }
+                }
+
+                item {
+                    val availability = reservationUiState.isCollaboratorAvailable
+                    val buttonText = when {
+                        availability == null -> "Verificando..."
+                        availability == true && paymentMethod == PaymentMethod.TRANSFER -> "Informar pago por WhatsApp"
+                        availability == true -> "Pagar y Reservar"
+                        else -> "Solicitar Reserva"
                     }
 
                     Button(
                         onClick = {
                             val (hour, minute) = date.get(Calendar.HOUR_OF_DAY) to date.get(Calendar.MINUTE)
                             val reservation = Reservation(
-                                serviceId = service.id,
                                 serviceName = service.nombre,
+                                price = service.precio,
                                 date = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(date.time),
                                 startTime = String.format("%02d:%02d", hour, minute),
                                 address = address!!,
-                                paymentMethod = paymentMethod,
-                                price = service.precio
+                                paymentMethod = if (availability == true) paymentMethod else null
                             )
                             reservationViewModel.createReservation(reservation, service.duracionMinutos)
                         },
                         modifier = Modifier.fillMaxWidth().height(50.dp),
-                        enabled = !reservationUiState.isLoading && address != null,
+                        enabled = !reservationUiState.isLoading && address != null && availability != null,
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface)
                     ) {
                         if (reservationUiState.isLoading) {
@@ -200,8 +214,6 @@ fun SelectServiceScreen(
         }
     }
 
-    // --- DIALOGS AND SHEETS (Reused from previous step) ---
-
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -214,7 +226,6 @@ fun SelectServiceScreen(
                         newDate.set(Calendar.MINUTE, date.get(Calendar.MINUTE))
                         date = newDate
                     }
-                    showTimePicker = true
                 }) { Text("Aceptar") }
             },
             dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") } }
@@ -232,9 +243,10 @@ fun SelectServiceScreen(
                 initialMinuteIndex = currentMinute,
                 onTimeSelected = {
                     hour, minute ->
-                    date = date.clone() as Calendar
-                    date.set(Calendar.HOUR_OF_DAY, hour)
-                    date.set(Calendar.MINUTE, minute)
+                    val newDate = date.clone() as Calendar
+                    newDate.set(Calendar.HOUR_OF_DAY, hour)
+                    newDate.set(Calendar.MINUTE, minute)
+                    date = newDate // This triggers the LaunchedEffect to check availability
                     scope.launch { showTimePicker = false }
                 }
             )
@@ -256,8 +268,38 @@ fun SelectServiceScreen(
     }
 }
 
+@Composable
+fun AvailabilityStatusBox(uiState: ReservationUiState) {
+    val (message, icon, color) = when (uiState.isCollaboratorAvailable) {
+        true -> Triple("¡Tenemos disponibilidad! Selecciona tu método de pago para confirmar.", Icons.Default.CheckCircle, MaterialTheme.colorScheme.primary)
+        false -> {
+            val estimatedTimeMessage = uiState.estimatedAvailability?.let {
+                "No tenemos mucamas disponibles para esa hora exacta, pero tendremos una disponible aproximadamente a las $it. ¿Deseas solicitar la reserva de todos modos?"
+            } ?: "Estamos buscando la mejor mucama para ti. Podrás realizar el pago una vez confirmemos la asignación."
+            Triple(estimatedTimeMessage, Icons.Default.Info, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+        }
+        null -> Triple("Verificando disponibilidad...", null, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+    }
 
-// --- UI Components ---
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        if (uiState.isLoading && uiState.isCollaboratorAvailable == null) {
+            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+        } else if (icon != null) {
+            Icon(icon, contentDescription = null, tint = color)
+        }
+        Text(message, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = color)
+    }
+}
+
+// Other UI components remain the same...
 
 @Composable
 fun WheelPicker(
@@ -364,7 +406,7 @@ fun PaymentMethodSelector(
                     onClick = { onMethodSelected(method) },
                     colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.onSurface)
                 )
-                Text(method.name)
+                Text(method.displayName)
             }
         }
     }

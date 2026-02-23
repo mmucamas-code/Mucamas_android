@@ -101,9 +101,9 @@ enum class PaymentStatus {
     FAILED
 }
 
-enum class PaymentMethod {
-    CASH,
-    TRANSFER,
-    CREDIT_CARD,
-    DEBIT_CARD
+enum class PaymentMethod(val displayName: String) {
+    CASH("Efectivo"),
+    TRANSFER("Transferencia"),
+    CREDIT_CARD("Tarjeta de Crédito"),
+    DEBIT_CARD("Tarjeta de Débito")
 }
