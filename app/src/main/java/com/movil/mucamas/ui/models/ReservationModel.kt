@@ -9,6 +9,7 @@ import java.util.Date
 data class Reservation(
     val id: String = "",
     val clientId: String = "",
+    val clientName: String = "",
 
     val serviceId: String = "",
     val serviceName: String = "",

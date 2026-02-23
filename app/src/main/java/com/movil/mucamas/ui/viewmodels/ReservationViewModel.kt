@@ -1,15 +1,11 @@
 package com.movil.mucamas.ui.viewmodels
 
-import android.net.Uri
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.storage.FirebaseStorage
 import com.movil.mucamas.data.SessionProvider
 import com.movil.mucamas.data.model.UserSession
 import com.movil.mucamas.ui.models.Address
+import com.movil.mucamas.ui.models.PaymentMethod
 import com.movil.mucamas.ui.models.Reservation
 import com.movil.mucamas.ui.models.ReservationRating
 import com.movil.mucamas.ui.models.ReservationStatus
@@ -24,7 +20,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import java.util.Calendar
 
 data class ReservationUiState(
@@ -32,16 +27,15 @@ data class ReservationUiState(
     val reservations: List<Reservation> = emptyList(),
     val isEmpty: Boolean = false,
     val availableCollaborators: List<UserDto> = emptyList(),
-    val addressHistory: List<Address> = emptyList() // Added
+    val addressHistory: List<Address> = emptyList()
 )
 
 sealed interface ReservationUiEvent {
     data class ShowError(val message: String) : ReservationUiEvent
-    data class ReservationCreated(val reservationId: String) : ReservationUiEvent
+    data class ReservationCreated(val reservationId: String, val reservationData: Reservation) : ReservationUiEvent
     object ReservationRated : ReservationUiEvent
     object ReservationUpdated : ReservationUiEvent
     object ShowCollaboratorSelector : ReservationUiEvent
-    data class ShowSuccess(val message: String) : ReservationUiEvent // Added
 }
 
 class ReservationViewModel(
@@ -59,12 +53,10 @@ class ReservationViewModel(
     val userSession = _userSession.asStateFlow()
 
     private val sessionManager = SessionProvider.get()
-    private val storage = FirebaseStorage.getInstance() // Added
-    var uploadedReceiptUrl by mutableStateOf<String?>(null) // Added
 
     init {
         loadReservations()
-        loadAddressHistory() // Added
+        loadAddressHistory()
     }
 
     private fun loadReservations() {
@@ -92,13 +84,10 @@ class ReservationViewModel(
         }
     }
 
-    // --- ADDED FUNCTIONS ---
-
     fun loadAddressHistory() {
         viewModelScope.launch {
             try {
                 val session = _userSession.value ?: return@launch
-                // Assuming repository has this method for a clean architecture
                 val history = reservationRepository.getAddressHistoryForUser(session.userId)
                 _uiState.update { it.copy(addressHistory = history) }
             } catch (e: Exception) {
@@ -106,26 +95,6 @@ class ReservationViewModel(
             }
         }
     }
-
-    fun uploadReceiptAndHoldUrl(uri: Uri) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            uploadedReceiptUrl = null // Reset before new upload
-            try {
-                val session = _userSession.value ?: throw IllegalStateException("Usuario no ha iniciado sesión")
-                val receiptRef = storage.reference.child("payment_receipts/${session.userId}/${System.currentTimeMillis()}")
-                val downloadUrl = receiptRef.putFile(uri).await().storage.downloadUrl.await().toString()
-                uploadedReceiptUrl = downloadUrl
-                _eventFlow.emit(ReservationUiEvent.ShowSuccess("Comprobante subido con éxito"))
-            } catch (e: Exception) {
-                _eventFlow.emit(ReservationUiEvent.ShowError("Error al subir comprobante: ${e.message}"))
-            } finally {
-                _uiState.update { it.copy(isLoading = false) }
-            }
-        }
-    }
-
-    // --- EXISTING FUNCTIONS (UNCHANGED) ---
 
     fun createReservation(reservation: Reservation, serviceDurationMinutes: Int) {
         viewModelScope.launch {
@@ -135,6 +104,7 @@ class ReservationViewModel(
 
                 val newReservationStub = reservation.copy(
                     clientId = session.userId,
+                    clientName = session.fullName,
                     endTime = calculateEndTime(reservation.startTime, serviceDurationMinutes)
                 )
 
@@ -142,12 +112,22 @@ class ReservationViewModel(
 
                 val finalReservation: Reservation
                 if (availableCollaborator != null) {
+                    val status = if (newReservationStub.paymentMethod == PaymentMethod.TRANSFER) {
+                        ReservationStatus.PENDING_CONFIRMATION
+                    } else {
+                        ReservationStatus.PENDING_PAYMENT
+                    }
                     finalReservation = newReservationStub.copy(
                         collaboratorId = availableCollaborator.idNumber,
-                        status = ReservationStatus.PENDING_PAYMENT
+                        status = status
                     )
                 } else {
-                    finalReservation = newReservationStub.copy(status = ReservationStatus.PENDING_ASSIGNMENT)
+                    val status = if (newReservationStub.paymentMethod == PaymentMethod.TRANSFER) {
+                        ReservationStatus.PENDING_CONFIRMATION
+                    } else {
+                        ReservationStatus.PENDING_ASSIGNMENT
+                    }
+                    finalReservation = newReservationStub.copy(status = status)
                 }
 
                 val reservationId = reservationRepository.createReservation(finalReservation)
@@ -156,7 +136,7 @@ class ReservationViewModel(
                     collaboratorRepository.setCollaboratorReservationId(availableCollaborator.idNumber, reservationId)
                 }
 
-                _eventFlow.emit(ReservationUiEvent.ReservationCreated(reservationId))
+                _eventFlow.emit(ReservationUiEvent.ReservationCreated(reservationId, finalReservation))
 
             } catch (e: Exception) {
                 _eventFlow.emit(ReservationUiEvent.ShowError(e.message ?: "Error creando la reserva."))

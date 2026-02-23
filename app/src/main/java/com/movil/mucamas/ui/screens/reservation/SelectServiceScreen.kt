@@ -1,9 +1,8 @@
 package com.movil.mucamas.ui.screens.reservation
 
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,14 +15,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -36,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -73,7 +69,7 @@ import com.movil.mucamas.ui.viewmodels.ReservationUiEvent
 import com.movil.mucamas.ui.viewmodels.ReservationViewModel
 import com.movil.mucamas.ui.viewmodels.ServicesUiState
 import kotlinx.coroutines.launch
-import java.text.Normalizer
+import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -108,28 +104,33 @@ fun SelectServiceScreen(
     val datePickerState = rememberDatePickerState(initialSelectedDateMillis = date.timeInMillis)
     val scope = rememberCoroutineScope()
 
-    // Set default address from history
     LaunchedEffect(reservationUiState.addressHistory) {
         if (address == null && reservationUiState.addressHistory.isNotEmpty()) {
             address = reservationUiState.addressHistory.first()
         }
     }
 
-    // Image Picker Launcher
-    val imagePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let { reservationViewModel.uploadReceiptAndHoldUrl(it) }
-    }
-
-    // Event Collector
+    // Event Collector for WhatsApp redirection
     LaunchedEffect(Unit) {
         reservationViewModel.eventFlow.collect { event ->
             when (event) {
                 is ReservationUiEvent.ReservationCreated -> {
-                    Toast.makeText(context, "Reserva creada con éxito", Toast.LENGTH_LONG).show()
+                    if (event.reservationData.paymentMethod == PaymentMethod.TRANSFER) {
+                        Toast.makeText(context, "Redirigiendo a WhatsApp... adjunta tu comprobante.", Toast.LENGTH_LONG).show()
+                        val reservation = event.reservationData
+                        val phone = "+573209469635" // Tu número de WhatsApp
+                        val message = URLEncoder.encode(
+                            "Hola Mucamas, Soy ${reservation.clientName} y envío el comprobante de mi pago. \nServicio: ${reservation.serviceName}\nTotal: ${FormatsHelpers.formatCurrencyCOP(reservation.price)}.",
+                            "UTF-8"
+                        )
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("whatsapp://send?phone=$phone&text=$message"))
+                        context.startActivity(intent)
+                    } else {
+                        Toast.makeText(context, "Reserva creada con éxito", Toast.LENGTH_LONG).show()
+                    }
                     onContinueClick()
                 }
                 is ReservationUiEvent.ShowError -> Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
-                is ReservationUiEvent.ShowSuccess -> Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
                 else -> {}
             }
         }
@@ -157,38 +158,37 @@ fun SelectServiceScreen(
                 item { ServiceSummaryCard(service.nombre, service.precio) }
                 item { DateTimeSelector(date, { showDatePicker = true }, { showTimePicker = true }) }
                 item { AddressSelector(address, { showAddressSheet = true }) }
-                item { PaymentMethodSelector(
-                    selectedMethod = paymentMethod,
-                    onMethodSelected = { paymentMethod = it },
-                    onUploadReceipt = { imagePickerLauncher.launch("image/*") },
-                    isUploading = reservationUiState.isLoading,
-                    receiptUrl = reservationViewModel.uploadedReceiptUrl
-                ) }
+                item { PaymentMethodSelector(paymentMethod, onMethodSelected = { paymentMethod = it }) }
 
                 item {
+                    val buttonText = if (paymentMethod == PaymentMethod.TRANSFER) {
+                        "Informar pago por WhatsApp"
+                    } else {
+                        "Reservar Ahora"
+                    }
+
                     Button(
                         onClick = {
                             val (hour, minute) = date.get(Calendar.HOUR_OF_DAY) to date.get(Calendar.MINUTE)
                             val reservation = Reservation(
+                                serviceId = service.id,
                                 serviceName = service.nombre,
                                 date = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(date.time),
                                 startTime = String.format("%02d:%02d", hour, minute),
                                 address = address!!,
                                 paymentMethod = paymentMethod,
-                                paymentReceiptUrl = if (paymentMethod == PaymentMethod.TRANSFER) reservationViewModel.uploadedReceiptUrl else null,
-                                //TODO: Calculate total price
-                                price = service.precio.toLong(),
+                                price = service.precio
                             )
                             reservationViewModel.createReservation(reservation, service.duracionMinutos)
-                         },
+                        },
                         modifier = Modifier.fillMaxWidth().height(50.dp),
                         enabled = !reservationUiState.isLoading && address != null,
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.onSurface)
                     ) {
-                        if (reservationUiState.isLoading && reservationViewModel.uploadedReceiptUrl == null) {
+                        if (reservationUiState.isLoading) {
                             CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.surface)
                         } else {
-                            Text("Reservar Ahora", color = MaterialTheme.colorScheme.surface, fontWeight = FontWeight.Bold)
+                            Text(buttonText, color = MaterialTheme.colorScheme.surface, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -200,7 +200,7 @@ fun SelectServiceScreen(
         }
     }
 
-    // --- DIALOGS AND SHEETS ---
+    // --- DIALOGS AND SHEETS (Reused from previous step) ---
 
     if (showDatePicker) {
         DatePickerDialog(
@@ -210,12 +210,11 @@ fun SelectServiceScreen(
                     showDatePicker = false
                     datePickerState.selectedDateMillis?.let { millis ->
                         val newDate = Calendar.getInstance().apply { timeInMillis = millis }
-                        // Keep original time
                         newDate.set(Calendar.HOUR_OF_DAY, date.get(Calendar.HOUR_OF_DAY))
                         newDate.set(Calendar.MINUTE, date.get(Calendar.MINUTE))
                         date = newDate
                     }
-                    showTimePicker = true // Open time picker after date
+                    showTimePicker = true
                 }) { Text("Aceptar") }
             },
             dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") } }
@@ -227,7 +226,7 @@ fun SelectServiceScreen(
     if (showTimePicker) {
         ModalBottomSheet(onDismissRequest = { showTimePicker = false }) {
             val currentHour = date.get(Calendar.HOUR_OF_DAY)
-            val currentMinute = date.get(Calendar.MINUTE) / 5 // Assuming 5-minute intervals
+            val currentMinute = date.get(Calendar.MINUTE) / 5
             TimeSheetContent(
                 initialHour = currentHour,
                 initialMinuteIndex = currentMinute,
@@ -256,6 +255,9 @@ fun SelectServiceScreen(
         }
     }
 }
+
+
+// --- UI Components ---
 
 @Composable
 fun WheelPicker(
@@ -305,8 +307,6 @@ fun TimeSheetContent(initialHour: Int, initialMinuteIndex: Int, onTimeSelected: 
     }
 }
 
-// --- Reusable & Updated Components from previous step ---
-
 @Composable
 fun ServiceSummaryCard(serviceName: String, price: Long) {
     Column {
@@ -314,7 +314,7 @@ fun ServiceSummaryCard(serviceName: String, price: Long) {
         Spacer(modifier = Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(serviceName, style = MaterialTheme.typography.bodyLarge)
-            Text( FormatsHelpers.formatCurrencyCOP(price), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Text(FormatsHelpers.formatCurrencyCOP(price), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
         }
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
     }
@@ -349,10 +349,7 @@ fun AddressSelector(address: Address?, onAddressClick: () -> Unit) {
 @Composable
 fun PaymentMethodSelector(
     selectedMethod: PaymentMethod,
-    onMethodSelected: (PaymentMethod) -> Unit,
-    onUploadReceipt: () -> Unit,
-    isUploading: Boolean,
-    receiptUrl: String?
+    onMethodSelected: (PaymentMethod) -> Unit
 ) {
     val paymentMethods = PaymentMethod.values().toList()
 
@@ -368,23 +365,6 @@ fun PaymentMethodSelector(
                     colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.onSurface)
                 )
                 Text(method.name)
-            }
-        }
-
-        if (selectedMethod == PaymentMethod.TRANSFER) {
-            Spacer(modifier = Modifier.height(16.dp))
-            if (isUploading) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-            } else if (receiptUrl != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.CheckCircle, "Comprobante subido", tint = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Comprobante cargado", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                }
-            } else {
-                OutlinedButton(onClick = onUploadReceipt, modifier = Modifier.fillMaxWidth()) {
-                    Text("Adjuntar Comprobante")
-                }
             }
         }
     }
@@ -425,7 +405,6 @@ fun AddressSheetContent(history: List<Address>, onAddressSelected: (Address) -> 
             OutlinedTextField(value = newAddressField, onValueChange = {newAddressField = it}, label = { Text("Escribe la dirección completa")}, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             Button(onClick = {
-                // TODO: Add full address object creation with City, etc.
                 if(newAddressField.isNotBlank()) onAddressSelected(Address(fullAddress = newAddressField))
             }, modifier = Modifier.fillMaxWidth()) {
                 Text("Usar esta dirección")
@@ -436,7 +415,7 @@ fun AddressSheetContent(history: List<Address>, onAddressSelected: (Address) -> 
 
 @Composable
 fun InfoCard(label: String, value: String, modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().then(modifier)) {
+    Box(modifier = Modifier.fillMaxWidth().then(modifier)) {
         Column {
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Normal)
             Spacer(Modifier.height(4.dp))
