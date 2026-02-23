@@ -25,6 +25,7 @@ data class Reservation(
     val status: ReservationStatus = ReservationStatus.PENDING_ASSIGNMENT,
     val paymentStatus: PaymentStatus = PaymentStatus.PENDING,
     val paymentMethod: PaymentMethod? = null,
+    val paymentReceiptUrl: String? = null,
 
     val ratings: List<ReservationRating> = emptyList(),
 
@@ -48,7 +49,8 @@ data class Address(
     val city: String = "Chigorodó",
     val neighborhood: String = "Kennedy",
     val street: String = "Calle 123 #45-67",
-    val notes: String = "Servicio adomicilio"
+    val notes: String = "Servicio adomicilio",
+    val fullAddress: String = "$street, $neighborhood, $city"
 )
 
 enum class ReservationStatus(
@@ -100,6 +102,7 @@ enum class PaymentStatus {
 
 enum class PaymentMethod {
     CASH,
+    TRANSFER,
     CREDIT_CARD,
     DEBIT_CARD
 }

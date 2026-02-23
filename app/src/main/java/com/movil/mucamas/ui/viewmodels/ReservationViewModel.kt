@@ -1,9 +1,15 @@
 package com.movil.mucamas.ui.viewmodels
 
+import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.storage.FirebaseStorage
 import com.movil.mucamas.data.SessionProvider
 import com.movil.mucamas.data.model.UserSession
+import com.movil.mucamas.ui.models.Address
 import com.movil.mucamas.ui.models.Reservation
 import com.movil.mucamas.ui.models.ReservationRating
 import com.movil.mucamas.ui.models.ReservationStatus
@@ -18,13 +24,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.Calendar
 
 data class ReservationUiState(
     val isLoading: Boolean = false,
     val reservations: List<Reservation> = emptyList(),
     val isEmpty: Boolean = false,
-    val availableCollaborators: List<UserDto> = emptyList()
+    val availableCollaborators: List<UserDto> = emptyList(),
+    val addressHistory: List<Address> = emptyList() // Added
 )
 
 sealed interface ReservationUiEvent {
@@ -33,6 +41,7 @@ sealed interface ReservationUiEvent {
     object ReservationRated : ReservationUiEvent
     object ReservationUpdated : ReservationUiEvent
     object ShowCollaboratorSelector : ReservationUiEvent
+    data class ShowSuccess(val message: String) : ReservationUiEvent // Added
 }
 
 class ReservationViewModel(
@@ -50,9 +59,12 @@ class ReservationViewModel(
     val userSession = _userSession.asStateFlow()
 
     private val sessionManager = SessionProvider.get()
+    private val storage = FirebaseStorage.getInstance() // Added
+    var uploadedReceiptUrl by mutableStateOf<String?>(null) // Added
 
     init {
         loadReservations()
+        loadAddressHistory() // Added
     }
 
     private fun loadReservations() {
@@ -79,6 +91,41 @@ class ReservationViewModel(
             }
         }
     }
+
+    // --- ADDED FUNCTIONS ---
+
+    fun loadAddressHistory() {
+        viewModelScope.launch {
+            try {
+                val session = _userSession.value ?: return@launch
+                // Assuming repository has this method for a clean architecture
+                val history = reservationRepository.getAddressHistoryForUser(session.userId)
+                _uiState.update { it.copy(addressHistory = history) }
+            } catch (e: Exception) {
+                _eventFlow.emit(ReservationUiEvent.ShowError("Error al cargar historial: ${e.message}"))
+            }
+        }
+    }
+
+    fun uploadReceiptAndHoldUrl(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            uploadedReceiptUrl = null // Reset before new upload
+            try {
+                val session = _userSession.value ?: throw IllegalStateException("Usuario no ha iniciado sesión")
+                val receiptRef = storage.reference.child("payment_receipts/${session.userId}/${System.currentTimeMillis()}")
+                val downloadUrl = receiptRef.putFile(uri).await().storage.downloadUrl.await().toString()
+                uploadedReceiptUrl = downloadUrl
+                _eventFlow.emit(ReservationUiEvent.ShowSuccess("Comprobante subido con éxito"))
+            } catch (e: Exception) {
+                _eventFlow.emit(ReservationUiEvent.ShowError("Error al subir comprobante: ${e.message}"))
+            } finally {
+                _uiState.update { it.copy(isLoading = false) }
+            }
+        }
+    }
+
+    // --- EXISTING FUNCTIONS (UNCHANGED) ---
 
     fun createReservation(reservation: Reservation, serviceDurationMinutes: Int) {
         viewModelScope.launch {

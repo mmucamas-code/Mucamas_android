@@ -3,6 +3,7 @@ package com.movil.mucamas.ui.repositories
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.movil.mucamas.ui.models.Address
 import com.movil.mucamas.ui.models.Reservation
 import com.movil.mucamas.ui.models.ReservationRating
 import com.movil.mucamas.ui.models.ReservationStatus
@@ -92,5 +93,19 @@ class ReservationRepository {
 
             transaction.update(reservationRef, "ratings", FieldValue.arrayUnion(rating))
         }.await()
+    }
+
+    suspend fun getAddressHistoryForUser(userId: String): List<Address> {
+        val snapshot = reservations
+            .whereEqualTo("clientId", userId)
+            .orderBy("createdAt", Query.Direction.DESCENDING)
+            .limit(5)
+            .get()
+            .await()
+
+        // Extrae el objeto Address, filtra los nulos y elimina duplicados
+        return snapshot.toObjects(Reservation::class.java)
+            .mapNotNull { it.address }
+            .distinctBy { it.fullAddress } // Asume que `fullAddress` es un identificador único
     }
 }

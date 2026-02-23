@@ -86,6 +86,8 @@ fun MyReservationsScreen(
                 is ReservationUiEvent.ShowCollaboratorSelector -> {
                     showCollaboratorSelector = true
                 }
+
+                else -> {}
             }
         }
     }
