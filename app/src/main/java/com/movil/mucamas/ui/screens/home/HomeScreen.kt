@@ -275,6 +275,11 @@ fun CategoryFilters(categories: List<String>, selectedCategory: String, onCatego
 
 @Composable
 fun ComboCard(service: Service, onClick: () -> Unit) {
+
+    val serviceIcon = remember(service.icono) {
+        getServiceIcon(service.icono)
+    }
+
     Card(
         modifier = Modifier
             .width(200.dp)
@@ -297,7 +302,7 @@ fun ComboCard(service: Service, onClick: () -> Unit) {
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(getServiceIcon(service.icono), contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurface)
+                Icon(serviceIcon, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurface)
             }
             Column(modifier = Modifier.padding(AdaptiveTheme.spacing.medium)) {
                 Text(service.nombre, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)

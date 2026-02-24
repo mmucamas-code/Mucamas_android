@@ -1,5 +1,6 @@
 package com.movil.mucamas.ui.utils
 
+import android.util.Log
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -45,6 +46,18 @@ object FirebaseHelpers {
 
     // Función para obtener el icono de un servicio
     fun getServiceIcon(iconName: String): ImageVector {
-        return Icons.Default.Star
+        // Aseguramos que el nombre empiece por Mayúscula (ej: "home" -> "Home")
+        val formattedName = iconName.replaceFirstChar { it.uppercase() }
+
+        return try {
+            // Buscamos en el catálogo de Material Icons usando reflexión
+            val clazz = Class.forName("androidx.compose.material.icons.filled.${formattedName}Kt")
+            val method = clazz.declaredMethods.first { it.name.startsWith("get") }
+            method.invoke(null, Icons.Filled) as ImageVector
+        } catch (e: Exception) {
+            // Log del error para debugging
+            Log.e("IconError", "No se encontró el icono: $formattedName, usando respaldo.")
+            Icons.Default.Star // Icono de respaldo
+        }
     }
 }
