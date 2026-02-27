@@ -122,6 +122,9 @@ fun SelectServiceScreen(
         reservationViewModel.eventFlow.collect { event ->
             when (event) {
                 is ReservationUiEvent.ReservationCreated -> {
+                    Toast.makeText(context, "Reserva creada con éxito", Toast.LENGTH_LONG).show()
+                    /*
+                    TODO: luego activamos esto porque voy a trabajr en emulador
                     if (event.reservationData.paymentMethod == PaymentMethod.TRANSFER) {
                         Toast.makeText(context, "Redirigiendo a WhatsApp... adjunta tu comprobante.", Toast.LENGTH_LONG).show()
                         val reservation = event.reservationData
@@ -134,7 +137,7 @@ fun SelectServiceScreen(
                         context.startActivity(intent)
                     } else {
                         Toast.makeText(context, "Reserva creada con éxito", Toast.LENGTH_LONG).show()
-                    }
+                    }*/
                     onContinueClick()
                 }
                 is ReservationUiEvent.ShowError -> Toast.makeText(context, event.message, Toast.LENGTH_LONG).show()
@@ -186,6 +189,7 @@ fun SelectServiceScreen(
                         onClick = {
                             val (hour, minute) = date.get(Calendar.HOUR_OF_DAY) to date.get(Calendar.MINUTE)
                             val reservation = Reservation(
+                                serviceId = service.id,
                                 serviceName = service.nombre,
                                 price = service.precio,
                                 date = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(date.time),

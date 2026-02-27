@@ -1,12 +1,14 @@
 package com.movil.mucamas.ui.models
 
 import androidx.compose.ui.graphics.Color
+import com.google.firebase.firestore.DocumentId
 import com.google.firebase.firestore.ServerTimestamp
 import com.movil.mucamas.ui.theme.OrangeAccent
 import com.movil.mucamas.ui.theme.TurquoiseMain
 import java.util.Date
 
 data class Reservation(
+    @DocumentId
     val id: String = "",
     val clientId: String = "",
     val clientName: String = "",
@@ -14,10 +16,11 @@ data class Reservation(
     val serviceId: String = "",
     val serviceName: String = "",
     val price: Long = 0,
+    val duracionMinutos: Int = 0,
 
     val date: String = "",
     val startTime: String = "",
-    val endTime: String = "",
+    val endTime: Date? = null,
 
     val address: Address = Address(),
 

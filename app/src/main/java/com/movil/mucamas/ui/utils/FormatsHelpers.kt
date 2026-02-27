@@ -29,7 +29,7 @@ object FormatsHelpers {
     }
 
 
-    fun formatTime(timestamp: Long): String {
+    fun formatTimestamp(timestamp: Long): String {
         val formatter = SimpleDateFormat("hh:mm a", Locale.getDefault())
         return formatter.format(Date(timestamp))
     }

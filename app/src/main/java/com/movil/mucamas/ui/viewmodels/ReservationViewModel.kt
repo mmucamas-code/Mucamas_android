@@ -1,10 +1,6 @@
 package com.movil.mucamas.ui.viewmodels
 
-import android.net.Uri
 import android.util.Log
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.FirebaseFirestore
@@ -12,6 +8,7 @@ import com.google.firebase.firestore.Query
 import com.movil.mucamas.data.SessionProvider
 import com.movil.mucamas.data.model.UserSession
 import com.movil.mucamas.ui.models.Address
+import com.movil.mucamas.ui.models.Collaborator
 import com.movil.mucamas.ui.models.PaymentMethod
 import com.movil.mucamas.ui.models.Reservation
 import com.movil.mucamas.ui.models.ReservationRating
@@ -20,6 +17,7 @@ import com.movil.mucamas.ui.models.UserDto
 import com.movil.mucamas.ui.models.UserRole
 import com.movil.mucamas.ui.repositories.CollaboratorRepository
 import com.movil.mucamas.ui.repositories.ReservationRepository
+import com.movil.mucamas.ui.repositories.ServiceRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -36,10 +34,10 @@ data class ReservationUiState(
     val isLoading: Boolean = false,
     val reservations: List<Reservation> = emptyList(),
     val isEmpty: Boolean = false,
-    val availableCollaborators: List<UserDto> = emptyList(),
+    val collaborators: List<Pair<UserDto, Collaborator?>> = emptyList(), // Para flujo Admin
     val addressHistory: List<Address> = emptyList(),
-    val isCollaboratorAvailable: Boolean? = null,
-    val estimatedAvailability: String? = null
+    val isCollaboratorAvailable: Boolean? = null, // Para flujo Cliente
+    val estimatedAvailability: String? = null // Para flujo Cliente
 )
 
 sealed interface ReservationUiEvent {
@@ -51,7 +49,10 @@ sealed interface ReservationUiEvent {
 }
 
 class ReservationViewModel(
-    private val reservationRepository: ReservationRepository = ReservationRepository(),
+    private val reservationRepository: ReservationRepository = ReservationRepository(
+        serviceRepository = ServiceRepository(),
+        collaboratorRepository = CollaboratorRepository()
+    ),
     private val collaboratorRepository: CollaboratorRepository = CollaboratorRepository()
 ) : ViewModel() {
 
@@ -76,50 +77,22 @@ class ReservationViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, isCollaboratorAvailable = null, estimatedAvailability = null) }
             try {
-                // Read-only query for availability
                 val availableNowQuery = db.collection("collaborators").whereEqualTo("isAvailable", true).limit(1).get().await()
                 if (!availableNowQuery.isEmpty) {
                     _uiState.update { it.copy(isCollaboratorAvailable = true, isLoading = false) }
                 } else {
-                    // Find next available if no one is free now
                     val nextAvailableQuery = db.collection("collaborators").orderBy("availableAt", Query.Direction.ASCENDING).limit(1).get().await()
                     if (!nextAvailableQuery.isEmpty) {
                         val availableAtTimestamp = nextAvailableQuery.documents.first().getTimestamp("availableAt")?.toDate()
                         val estimatedTime = availableAtTimestamp?.let { SimpleDateFormat("hh:mm a", Locale.getDefault()).format(it) }
                         _uiState.update { it.copy(isCollaboratorAvailable = false, estimatedAvailability = estimatedTime, isLoading = false) }
                     } else {
-                        _uiState.update { it.copy(isCollaboratorAvailable = false, isLoading = false) } // No collaborators exist
+                        _uiState.update { it.copy(isCollaboratorAvailable = false, isLoading = false) }
                     }
                 }
             } catch (e: Exception) {
                 _eventFlow.emit(ReservationUiEvent.ShowError("Error al verificar disponibilidad: ${e.message}"))
                 _uiState.update { it.copy(isLoading = false, isCollaboratorAvailable = false) }
-            }
-        }
-    }
-
-    private fun loadReservations() {
-        viewModelScope.launch {
-            sessionManager.userSessionFlow.collect { userSession ->
-                _userSession.value = userSession
-                if (userSession != null) {
-                    reservationRepository.getReservations(userSession.userId, userSession.role)
-                        .catch { e -> _eventFlow.emit(ReservationUiEvent.ShowError("Error al cargar las reservas: ${e.message}")) }
-                        .collect { reservations -> _uiState.update { it.copy(reservations = reservations, isEmpty = reservations.isEmpty()) } }
-                } else {
-                    _uiState.update { it.copy(isEmpty = true) }
-                }
-            }
-        }
-    }
-
-    fun loadAddressHistory() {
-        viewModelScope.launch {
-            try {
-                val session = _userSession.value ?: return@launch
-                _uiState.update { it.copy(addressHistory = reservationRepository.getAddressHistoryForUser(session.userId)) }
-            } catch (e: Exception) {
-                _eventFlow.emit(ReservationUiEvent.ShowError("Error al cargar historial: ${e.message}"))
             }
         }
     }
@@ -130,32 +103,38 @@ class ReservationViewModel(
             try {
                 val session = _userSession.value ?: throw IllegalStateException("Sesión no disponible.")
 
-                var finalReservation = reservation.copy(
-                    clientId = session.userId,
-                    clientName = session.fullName,
-                    endTime = calculateEndTime(reservation.startTime, serviceDurationMinutes)
-                )
-
-                // The definitive lock and assignment happens here, and only here.
                 val availableCollaborator = collaboratorRepository.findAndLockAvailableCollaborator()
 
-                Log.d("DEBUG_COLLAB", "Documentos encontrados: ${availableCollaborator?.userId}")
+                val finalReservation = if (availableCollaborator != null) {
+                    val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+                    val startDate = try { sdf.parse("${reservation.date} ${reservation.startTime}") } catch(e: Exception) { Calendar.getInstance().time }
+                    val endTime = Calendar.getInstance().apply {
+                        time = startDate
+                        add(Calendar.MINUTE, serviceDurationMinutes)
+                    }.time
 
-                if (availableCollaborator != null) {
-                    finalReservation = finalReservation.copy(
-                        collaboratorId = availableCollaborator.userId, // Correctly assign the collaborator's userId
-                        status = if (finalReservation.paymentMethod == PaymentMethod.TRANSFER) ReservationStatus.PENDING_CONFIRMATION else ReservationStatus.PENDING_CONFIRMATION
+                    reservation.copy(
+                        clientId = session.userId,
+                        clientName = session.fullName,
+                        collaboratorId = availableCollaborator.userId,
+                        status = if (reservation.paymentMethod == PaymentMethod.TRANSFER) ReservationStatus.PENDING_CONFIRMATION else ReservationStatus.PENDING_PAYMENT,
+                        duracionMinutos = serviceDurationMinutes,
+                        endTime = endTime
                     )
                 } else {
-                    finalReservation = finalReservation.copy(
-                        collaboratorId = null, // Ensure collaboratorId is null
-                        status = ReservationStatus.PENDING_ASSIGNMENT
+                    reservation.copy(
+                        clientId = session.userId,
+                        clientName = session.fullName,
+                        collaboratorId = null,
+                        status = ReservationStatus.PENDING_ASSIGNMENT,
+                        paymentMethod = null,
+                        duracionMinutos = serviceDurationMinutes,
+                        endTime = null
                     )
                 }
 
                 val reservationId = reservationRepository.createReservation(finalReservation)
 
-                // Set the reservation ID on the collaborator, which should also handle setting isAvailable to false
                 if (availableCollaborator != null) {
                     collaboratorRepository.setCollaboratorReservationId(availableCollaborator.userId, reservationId)
                 }
@@ -169,17 +148,16 @@ class ReservationViewModel(
             }
         }
     }
-    
-    // --- OTHER UNCHANGED FUNCTIONS ---
+
     fun onAssignCollaboratorClicked() {
         viewModelScope.launch {
             if (_userSession.value?.role != UserRole.ADMIN) return@launch
 
             _uiState.update { it.copy(isLoading = true) }
             try {
-                val collaborators = collaboratorRepository.getAvailableCollaboratorsForAdmin()
+                val collaborators = collaboratorRepository.getAllCollaborators()
                 if (collaborators.isNotEmpty()) {
-                    _uiState.update { it.copy(availableCollaborators = collaborators) }
+                    _uiState.update { it.copy(collaborators = collaborators) }
                     _eventFlow.emit(ReservationUiEvent.ShowCollaboratorSelector)
                 } else {
                     _eventFlow.emit(ReservationUiEvent.ShowError("No hay colaboradores disponibles."))
@@ -198,7 +176,6 @@ class ReservationViewModel(
             _uiState.update { it.copy(isLoading = true) }
             try {
                 reservationRepository.assignCollaborator(reservationId, collaboratorId)
-                collaboratorRepository.assignReservationToCollaborator(collaboratorId, reservationId)
                 _eventFlow.emit(ReservationUiEvent.ReservationUpdated)
             } catch (e: Exception) {
                 _eventFlow.emit(ReservationUiEvent.ShowError(e.message ?: "Error asignando colaborador."))
@@ -276,19 +253,29 @@ class ReservationViewModel(
         }
     }
 
-    private fun calculateEndTime(startTime: String, durationMinutes: Int): String {
-        val calendar = Calendar.getInstance()
-        val timeParts = startTime.split(":")
-        if (timeParts.size == 2) {
-            try {
-                calendar.set(Calendar.HOUR_OF_DAY, timeParts[0].toInt())
-                calendar.set(Calendar.MINUTE, timeParts[1].toInt())
-                calendar.add(Calendar.MINUTE, durationMinutes)
-                val hour = calendar.get(Calendar.HOUR_OF_DAY)
-                val minute = calendar.get(Calendar.MINUTE)
-                return String.format("%02d:%02d", hour, minute)
-            } catch (e: NumberFormatException) { return "" }
+    private fun loadReservations() {
+        viewModelScope.launch {
+            sessionManager.userSessionFlow.collect { userSession ->
+                _userSession.value = userSession
+                if (userSession != null) {
+                    reservationRepository.getReservations(userSession.userId, userSession.role)
+                        .catch { e -> _eventFlow.emit(ReservationUiEvent.ShowError("Error al cargar las reservas: ${e.message}")) }
+                        .collect { reservations -> _uiState.update { it.copy(reservations = reservations, isEmpty = reservations.isEmpty()) } }
+                } else {
+                    _uiState.update { it.copy(isEmpty = true) }
+                }
+            }
         }
-        return ""
+    }
+
+    fun loadAddressHistory() {
+        viewModelScope.launch {
+            try {
+                val session = _userSession.value ?: return@launch
+                _uiState.update { it.copy(addressHistory = reservationRepository.getAddressHistoryForUser(session.userId)) }
+            } catch (e: Exception) {
+                _eventFlow.emit(ReservationUiEvent.ShowError("Error al cargar historial: ${e.message}"))
+            }
+        }
     }
 }

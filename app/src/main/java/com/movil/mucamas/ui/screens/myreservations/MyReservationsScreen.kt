@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.movil.mucamas.ui.components.EmptyStateView
 import com.movil.mucamas.ui.components.FullScreenLoading
+import com.movil.mucamas.ui.models.Collaborator
 import com.movil.mucamas.ui.models.Reservation
 import com.movil.mucamas.ui.models.ReservationStatus
 import com.movil.mucamas.ui.models.UserDto
@@ -139,7 +140,7 @@ fun MyReservationsScreen(
 
         if (showCollaboratorSelector && reservationToAssign != null) {
             CollaboratorSelectionDialog(
-                collaborators = uiState.availableCollaborators,
+                collaborators = uiState.collaborators,
                 onDismiss = { showCollaboratorSelector = false },
                 onConfirm = { collaboratorId ->
                     viewModel.assignCollaboratorToReservation(reservationToAssign!!.id, collaboratorId)
@@ -152,7 +153,7 @@ fun MyReservationsScreen(
 
 @Composable
 fun CollaboratorSelectionDialog(
-    collaborators: List<UserDto>,
+    collaborators: List<Pair<UserDto, Collaborator?>>,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
@@ -161,14 +162,26 @@ fun CollaboratorSelectionDialog(
         title = { Text("Asignar Colaborador") },
         text = {
             LazyColumn {
-                items(collaborators) { collaborator ->
-                    Text(
-                        text = collaborator.fullName,
+                items(collaborators) { (user, collaborator) ->
+                    val isAvailable = collaborator?.isAvailable ?: true
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onConfirm(collaborator.idNumber) }
+                            .clickable(enabled = isAvailable) { onConfirm(user.idNumber) }
                             .padding(vertical = 16.dp)
-                    )
+                    ) {
+                        Text(
+                            text = user.fullName,
+                            fontWeight = if (isAvailable) FontWeight.Normal else FontWeight.Light
+                        )
+                        if (!isAvailable) {
+                            Text(
+                                text = "No disponible hasta ${collaborator?.availableAt?.let { FormatsHelpers.formatTimestamp(it) }}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Light
+                            )
+                        }
+                    }
                 }
             }
         },

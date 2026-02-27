@@ -39,4 +39,9 @@ class ServiceRepository {
         Log.d("Session", "Service: $serviceObject")
         return serviceObject
     }
+
+    suspend fun getServiceById(serviceId: String): Service? {
+        val document = firestore.collection("services").document(serviceId).get().await()
+        return document.toObject(Service::class.java)
+    }
 }

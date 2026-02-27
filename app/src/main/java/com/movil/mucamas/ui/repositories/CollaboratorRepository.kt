@@ -1,7 +1,6 @@
 package com.movil.mucamas.ui.repositories
 
 import android.util.Log
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.movil.mucamas.ui.models.Collaborator
@@ -15,12 +14,7 @@ class CollaboratorRepository {
     private val usersCollection = firestore.collection("users")
     private val collaboratorsCollection = firestore.collection("collaborators")
 
-    /**
-     * Finds an available collaborator, locks them transactionally, and returns their User data.
-     * This prevents race conditions where two users might be assigned the same collaborator.
-     */
     suspend fun findAndLockAvailableCollaborator(): Collaborator? {
-        // PASO 1: Buscar al colaborador disponible más antiguo
         val candidatesQuery = collaboratorsCollection
             .whereEqualTo("isAvailable", true)
             .orderBy("lastUpdatedAt", Query.Direction.ASCENDING)
@@ -28,34 +22,18 @@ class CollaboratorRepository {
             .get()
             .await()
 
-        Log.d("DEBUG_COLLAB", "Documentos encontrados: ${candidatesQuery.size()}")
-
         if (candidatesQuery.isEmpty) return null
 
         val doc = candidatesQuery.documents.first()
 
         return try {
             firestore.runTransaction { transaction ->
-                // LECTURA 1: Obtener datos frescos del colaborador
                 val freshDoc = transaction.get(doc.reference)
-
-                // Verificación de seguridad
                 if (freshDoc.exists() && freshDoc.getBoolean("isAvailable") == true) {
-
-                    // Mapeamos el documento directamente a la clase Collaborator
                     val collaboratorObject = freshDoc.toObject(Collaborator::class.java)
-
                     if (collaboratorObject != null) {
-                        // ESCRITURA: Bloqueamos al colaborador
-                        // Usamos System.currentTimeMillis() porque tu data class espera un Long, no un ServerTimestamp de Firebase
                         val now = System.currentTimeMillis()
-
-                        transaction.update(doc.reference,
-                            "isAvailable", false,
-                            "lastUpdatedAt", now
-                        )
-
-                        // Retornamos el objeto con los datos actualizados para la lógica local
+                        transaction.update(doc.reference, "isAvailable", false, "lastUpdatedAt", now)
                         collaboratorObject.copy(isAvailable = false, lastUpdatedAt = now)
                     } else {
                         null
@@ -65,73 +43,51 @@ class CollaboratorRepository {
                 }
             }.await()
         } catch (e: Exception) {
-            Log.e("FirestoreError", "Error en transacción: ${e.message}")
+            Log.e("FirestoreError", "Error en transacción findAndLock: ${e.message}")
             null
         }
     }
 
-    /**
-     * Sets the reservation ID for a collaborator who has just been assigned a task.
-     */
+    suspend fun getAllCollaborators(): List<Pair<UserDto, Collaborator?>> {
+        val usersSnapshot = usersCollection.whereEqualTo("role", UserRole.COLLABORATOR.name).get().await()
+        val users = usersSnapshot.toObjects(UserDto::class.java)
+
+        val collaboratorDetails = collaboratorsCollection.get().await().toObjects(Collaborator::class.java)
+        val detailsMap = collaboratorDetails.associateBy { it.userId }
+
+        return users.map { user ->
+            Pair(user, detailsMap[user.idNumber])
+        }
+    }
+
+    suspend fun setCollaboratorAvailability(collaboratorId: String, isAvailable: Boolean) {
+        val updates = mutableMapOf<String, Any?>(
+            "isAvailable" to isAvailable,
+            "currentReservationId" to null,
+            "lastUpdatedAt" to System.currentTimeMillis()
+        )
+        if (isAvailable) {
+            updates["availableAt"] = null
+        }
+
+        collaboratorsCollection.document(collaboratorId).update(updates).await()
+    }
+
+    suspend fun assignReservationToCollaborator(collaboratorId: String, reservationId: String, availableAt: Long) {
+        val collaboratorDocRef = collaboratorsCollection.document(collaboratorId)
+        val updates = mapOf(
+            "isAvailable" to false,
+            "currentReservationId" to reservationId,
+            "availableAt" to availableAt,
+            "lastUpdatedAt" to System.currentTimeMillis()
+        )
+        collaboratorDocRef.update(updates).await()
+    }
+
     suspend fun setCollaboratorReservationId(collaboratorId: String, reservationId: String) {
         collaboratorsCollection.document(collaboratorId).update(
             "currentReservationId", reservationId,
             "lastUpdatedAt", System.currentTimeMillis()
         ).await()
-    }
-
-    /**
-     * Gets the list of collaborators who are available to be manually assigned by an Admin.
-     */
-    suspend fun getAvailableCollaboratorsForAdmin(): List<UserDto> {
-        val allCollaboratorUsers = usersCollection.whereEqualTo("role", UserRole.COLLABORATOR.name).get().await()
-        if (allCollaboratorUsers.isEmpty) return emptyList()
-
-        val userIds = allCollaboratorUsers.map { it.id }
-        val busyCollaborators = collaboratorsCollection.whereIn("userId", userIds)
-            .whereEqualTo("isAvailable", false).get().await()
-        val busyIds = busyCollaborators.mapNotNull { it.getString("userId") }
-
-        return allCollaboratorUsers.documents
-            .filter { it.id !in busyIds }
-            .mapNotNull { it.toObject(UserDto::class.java) }
-    }
-
-    /**
-     * Updates a collaborator's status, typically to release them after a reservation is completed or cancelled.
-     */
-    suspend fun setCollaboratorAvailability(collaboratorId: String, isAvailable: Boolean) {
-        val updates = mapOf(
-            "isAvailable" to isAvailable,
-            "currentReservationId" to null, // Always clear the reservation ID when availability changes
-            "lastUpdatedAt" to System.currentTimeMillis()
-        )
-        collaboratorsCollection.document(collaboratorId).update(updates).await()
-    }
-
-    /**
-     * Assigns a reservation to a collaborator, creating their collaborator document if it's their first time.
-     * This is used for manual assignment by an Admin.
-     */
-    suspend fun assignReservationToCollaborator(collaboratorId: String, reservationId: String) {
-        val collaboratorDocRef = collaboratorsCollection.document(collaboratorId)
-        val docSnapshot = collaboratorDocRef.get().await()
-
-        if (docSnapshot.exists()) {
-            val updates = mapOf(
-                "isAvailable" to false,
-                "currentReservationId" to reservationId,
-                "lastUpdatedAt" to System.currentTimeMillis()
-            )
-            collaboratorDocRef.update(updates).await()
-        } else {
-            val newCollaborator = Collaborator(
-                userId = collaboratorId,
-                isAvailable = false,
-                currentReservationId = reservationId,
-                lastUpdatedAt = System.currentTimeMillis()
-            )
-            collaboratorDocRef.set(newCollaborator).await()
-        }
     }
 }

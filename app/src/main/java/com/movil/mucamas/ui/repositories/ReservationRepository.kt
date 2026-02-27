@@ -12,19 +12,36 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import java.util.Calendar
 import java.util.Date
 
-class ReservationRepository {
+class ReservationRepository(
+    private val serviceRepository: ServiceRepository,
+    private val collaboratorRepository: CollaboratorRepository
+) {
     private val firestore = FirebaseFirestore.getInstance()
     private val reservations = firestore.collection("reservations")
 
     suspend fun createReservation(reservation: Reservation): String {
+        val service = serviceRepository.getServiceById(reservation.serviceId)
+            ?: throw Exception("Service not found")
+
+        val startTime = Calendar.getInstance().apply {
+            time = Date() // O la fecha/hora de inicio que elijas
+        }
+
+        val endTime = startTime.apply {
+            add(Calendar.MINUTE, service.duracionMinutos)
+        }
+
         val doc = reservations.document()
         doc.set(
             reservation.copy(
                 id = doc.id,
                 createdAt = Date(),
-                updatedAt = Date()
+                updatedAt = Date(),
+                endTime = endTime.time,
+                duracionMinutos = service.duracionMinutos
             )
         ).await()
         return doc.id
@@ -37,7 +54,6 @@ class ReservationRepository {
                 .whereEqualTo("collaboratorId", userId)
                 .whereIn(
                     "status", listOf(
-                        ReservationStatus.PENDING_CONFIRMATION.name,
                         ReservationStatus.CONFIRMED.name,
                         ReservationStatus.IN_PROGRESS.name,
                         ReservationStatus.COMPLETED.name
@@ -66,6 +82,16 @@ class ReservationRepository {
     }
 
     suspend fun assignCollaborator(reservationId: String, collaboratorId: String) {
+        val reservation = reservations.document(reservationId).get().await().toObject(Reservation::class.java)
+            ?: throw Exception("Reservation not found")
+
+        val endTime = Calendar.getInstance().apply {
+            time = reservation.createdAt ?: Date()
+            add(Calendar.MINUTE, reservation.duracionMinutos)
+        }
+
+        collaboratorRepository.assignReservationToCollaborator(collaboratorId, reservationId, endTime.timeInMillis)
+
         reservations.document(reservationId).update(
             mapOf(
                 "collaboratorId" to collaboratorId,
