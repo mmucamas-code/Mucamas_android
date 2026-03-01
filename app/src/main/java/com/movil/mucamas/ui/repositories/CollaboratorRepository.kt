@@ -34,7 +34,9 @@ class CollaboratorRepository {
                     if (collaboratorObject != null) {
                         val now = System.currentTimeMillis()
                         transaction.update(doc.reference, "isAvailable", false, "lastUpdatedAt", now)
-                        collaboratorObject.copy(isAvailable = false, lastUpdatedAt = now)
+                        collaboratorObject.isAvailable = false
+                        collaboratorObject.lastUpdatedAt = now
+                        collaboratorObject
                     } else {
                         null
                     }
@@ -49,14 +51,21 @@ class CollaboratorRepository {
     }
 
     suspend fun getAllCollaborators(): List<Pair<UserDto, Collaborator?>> {
+        // Obtenemos todos los usuarios con rol COLLABORATOR
         val usersSnapshot = usersCollection.whereEqualTo("role", UserRole.COLLABORATOR.name).get().await()
         val users = usersSnapshot.toObjects(UserDto::class.java)
 
+        // Obtenemos todos los documentos de la colección collaborators
         val collaboratorDetails = collaboratorsCollection.get().await().toObjects(Collaborator::class.java)
+        
+        // El mapa debe hacerse usando el campo userId que coincide con idNumber del usuario
         val detailsMap = collaboratorDetails.associateBy { it.userId }
 
         return users.map { user ->
-            Pair(user, detailsMap[user.idNumber])
+            val details = detailsMap[user.idNumber]
+            // Log para depuración
+            Log.d("CollaboratorRepo", "User: ${user.fullName}, ID: ${user.idNumber}, Details found: ${details != null}, IsAvailable: ${details?.isAvailable}")
+            Pair(user, details)
         }
     }
 

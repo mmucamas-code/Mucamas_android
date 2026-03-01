@@ -5,15 +5,17 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.*
@@ -23,7 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -191,12 +192,12 @@ fun FilterSection(
                     selected = selectedStatus != null,
                     onClick = { expanded = true },
                     label = { Text(selectedStatus?.label ?: "Todos los estados") },
-                    trailingIcon = {
+                    trailingIcon = { 
                         Icon(
-                            imageVector = Icons.Default.FilterList,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp) // Use Modifier instead
-                        )
+                            imageVector = Icons.Default.FilterList, 
+                            contentDescription = null, 
+                            modifier = Modifier.size(18.dp)
+                        ) 
                     }
                 )
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -225,7 +226,7 @@ fun PaymentModal(
     val clipboardManager = LocalClipboardManager.current
     val accountManager = "0123456789 (Bancolombia)"
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let { onReceiptAttached(it) }
+        uri?.let { onReceiptAttached(uri) }
     }
 
     AlertDialog(
@@ -236,7 +237,6 @@ fun PaymentModal(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // QR Placeholder
                 Box(
                     Modifier
                         .size(180.dp)
@@ -530,37 +530,122 @@ fun CollaboratorSelectionDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Asignar Colaborador") },
+        title = { 
+            Text(
+                "Asignar Colaborador",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            ) 
+        },
         text = {
-            Box(Modifier.heightIn(max = 300.dp)) {
-                LazyColumn {
+            Box(Modifier.heightIn(max = 400.dp)) {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     items(collaborators) { (user, collaborator) ->
-                        val isAvailable = collaborator?.isAvailable ?: true
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(enabled = isAvailable) { onConfirm(user.idNumber) }
-                                .padding(vertical = 12.dp)
-                        ) {
-                            Text(
-                                text = user.fullName,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = if (isAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
-                            )
-                            if (!isAvailable) {
-                                Text(
-                                    text = "No disponible",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
+                        CollaboratorItem(
+                            user = user,
+                            collaborator = collaborator,
+                            onClick = { onConfirm(user.idNumber) }
+                        )
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar") }
+            TextButton(onClick = onDismiss) { Text("Cerrar") }
         }
     )
+}
+
+@Composable
+fun CollaboratorItem(
+    user: UserDto,
+    collaborator: Collaborator?,
+    onClick: () -> Unit
+) {
+    val isAvailable = collaborator?.isAvailable ?: true
+    val availableAt = collaborator?.availableAt
+    
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { if(isAvailable){ onClick()} },
+        colors = CardDefaults.cardColors(
+            containerColor = if (isAvailable) 
+                MaterialTheme.colorScheme.surface 
+            else 
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Avatar Placeholder con inicial
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    user.fullName.take(1).uppercase(),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
+            Spacer(Modifier.width(16.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = user.fullName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val statusColor = if (isAvailable) Color(0xFF4CAF50) else Color(0xFFFFA000)
+                    val statusIcon = if (isAvailable) Icons.Default.CheckCircle else Icons.Default.AccessTime
+                    
+                    Icon(
+                        imageVector = statusIcon,
+                        contentDescription = null,
+                        tint = statusColor,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    
+                    Spacer(Modifier.width(4.dp))
+                    
+                    Text(
+                        text = if (isAvailable) "Disponible ahora" else "Ocupado",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = statusColor
+                    )
+                }
+                
+                if (!isAvailable && availableAt != null) {
+                    Text(
+                        text = "Disponible aprox: ${FormatsHelpers.formatTimestamp(availableAt)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+            
+            if (isAvailable) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+    }
 }

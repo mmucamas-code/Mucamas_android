@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
 data class ReservationUiState(
@@ -111,8 +112,10 @@ class ReservationViewModel(
                 } else {
                     val nextAvailableQuery = db.collection("collaborators").orderBy("availableAt", Query.Direction.ASCENDING).limit(1).get().await()
                     if (!nextAvailableQuery.isEmpty) {
-                        val availableAtTimestamp = nextAvailableQuery.documents.first().getTimestamp("availableAt")?.toDate()
-                        val estimatedTime = availableAtTimestamp?.let { SimpleDateFormat("hh:mm a", Locale.getDefault()).format(it) }
+                        val availableAtMillis = nextAvailableQuery.documents.first().getLong("availableAt")
+                        val estimatedTime = availableAtMillis?.let { 
+                            SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(it)) 
+                        }
                         _uiState.update { it.copy(isCollaboratorAvailable = false, estimatedAvailability = estimatedTime, isLoading = false) }
                     } else {
                         _uiState.update { it.copy(isCollaboratorAvailable = false, isLoading = false) }
