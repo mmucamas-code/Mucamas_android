@@ -12,8 +12,10 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
+import java.util.Locale
 
 class ReservationRepository(
     private val serviceRepository: ServiceRepository,
@@ -47,10 +49,17 @@ class ReservationRepository(
         return doc.id
     }
 
-    fun getReservations(userId: String, role: UserRole): Flow<List<Reservation>> = callbackFlow {
-        val query = when (role) {
-            UserRole.CLIENT -> reservations.whereEqualTo("clientId", userId)
-            UserRole.COLLABORATOR -> reservations
+    fun getReservations(
+        userId: String, 
+        role: UserRole, 
+        onlyToday: Boolean = false,
+        statusFilter: ReservationStatus? = null
+    ): Flow<List<Reservation>> = callbackFlow {
+        var query: Query = reservations
+
+        query = when (role) {
+            UserRole.CLIENT -> query.whereEqualTo("clientId", userId)
+            UserRole.COLLABORATOR -> query
                 .whereEqualTo("collaboratorId", userId)
                 .whereIn(
                     "status", listOf(
@@ -59,8 +68,16 @@ class ReservationRepository(
                         ReservationStatus.COMPLETED.name
                     )
                 )
+            UserRole.ADMIN -> query
+        }
 
-            UserRole.ADMIN -> reservations
+        if (onlyToday) {
+            val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+            query = query.whereEqualTo("date", today)
+        }
+
+        if (statusFilter != null) {
+            query = query.whereEqualTo("status", statusFilter.name)
         }
 
         val listener = query.orderBy("createdAt", Query.Direction.DESCENDING)
@@ -79,6 +96,15 @@ class ReservationRepository(
 
     suspend fun updateStatus(reservationId: String, status: ReservationStatus) {
         reservations.document(reservationId).update("status", status.name, "updatedAt", Date()).await()
+    }
+
+    suspend fun updatePaymentStatus(reservationId: String, receiptUrl: String?) {
+        val updates = mutableMapOf<String, Any>(
+            "status" to ReservationStatus.PENDING_CONFIRMATION.name,
+            "updatedAt" to Date()
+        )
+        receiptUrl?.let { updates["paymentReceiptUrl"] = it }
+        reservations.document(reservationId).update(updates).await()
     }
 
     suspend fun assignCollaborator(reservationId: String, collaboratorId: String) {
@@ -100,6 +126,7 @@ class ReservationRepository(
             )
         ).await()
     }
+
     suspend fun rateReservation(reservationId: String, rating: ReservationRating) {
         val reservationRef = reservations.document(reservationId)
         firestore.runTransaction { transaction ->
@@ -113,11 +140,16 @@ class ReservationRepository(
 
             val existingRating = reservation.ratings.find { it.role == rating.role }
             if (existingRating != null) {
-                // No hacemos nada si ya existe una calificación
                 return@runTransaction
             }
 
             transaction.update(reservationRef, "ratings", FieldValue.arrayUnion(rating))
+            
+            // Si es la calificación del cliente, actualizamos el rating del colaborador
+            if (rating.role == UserRole.CLIENT && reservation.collaboratorId != null) {
+                // Esto requeriría actualizar el rating del colaborador en su documento
+                // Se podría manejar con un Cloud Function o aquí mismo si tenemos acceso
+            }
         }.await()
     }
 
@@ -129,9 +161,8 @@ class ReservationRepository(
             .get()
             .await()
 
-        // Extrae el objeto Address, filtra los nulos y elimina duplicados
         return snapshot.toObjects(Reservation::class.java)
             .mapNotNull { it.address }
-            .distinctBy { it.fullAddress } // Asume que `fullAddress` es un identificador único
+            .distinctBy { it.fullAddress }
     }
 }

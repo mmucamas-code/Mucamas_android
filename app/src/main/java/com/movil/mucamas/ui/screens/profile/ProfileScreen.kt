@@ -4,71 +4,41 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.movil.mucamas.data.model.SessionResult
-import com.movil.mucamas.data.model.UserSession
+import com.movil.mucamas.ui.models.UserAddress
 import com.movil.mucamas.ui.utils.AdaptiveTheme
 import com.movil.mucamas.ui.viewmodels.MainViewModel
+import com.movil.mucamas.ui.viewmodels.ProfileViewModel
 
 @Composable
 fun ProfileScreen(
     onLogoutClick: () -> Unit = {},
-    mainViewModel: MainViewModel = viewModel()
+    mainViewModel: MainViewModel = viewModel(),
+    profileViewModel: ProfileViewModel = viewModel()
 ) {
     val spacing = AdaptiveTheme.spacing
-    val dimens = AdaptiveTheme.dimens
     val typography = AdaptiveTheme.typography
-    val sessionState by mainViewModel.sessionState.collectAsState()
-    var userLogged by remember { mutableStateOf<UserSession?>(null) }
-
-    LaunchedEffect(sessionState) {
-        when (val result = sessionState) {
-            is SessionResult.Success -> { userLogged = result.user }
-            is SessionResult.Empty -> { }
-            is SessionResult.Loading -> {}
-        }
-    }
+    val uiState by profileViewModel.uiState.collectAsState()
+    
+    var showAddressDialog by remember { mutableStateOf(false) }
+    var selectedAddress by remember { mutableStateOf<UserAddress?>(null) }
 
     Column(
         modifier = Modifier
@@ -76,7 +46,7 @@ fun ProfileScreen(
             .padding(horizontal = spacing.large)
             .verticalScroll(rememberScrollState())
     ) {
-        // Header con Foto y Nombre
+        // Header con Foto, Nombre y Rating
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -102,7 +72,7 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = userLogged?.fullName ?: "Nombre de Usuario",
+                    text = uiState.user?.fullName ?: "Cargando...",
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontSize = typography.headline,
                         fontWeight = FontWeight.Bold,
@@ -112,22 +82,17 @@ fun ProfileScreen(
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(20.dp)
+                RatingStars(rating = uiState.user?.rating ?: 5.0)
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                Text(
+                    text = "Rol: ${uiState.user?.role ?: "-"} | ID: ${uiState.user?.idNumber ?: "-"}",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = typography.body,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Rol: ${userLogged?.role ?: "-"} | ID: ${userLogged?.idNumber ?: "-"}",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = typography.body,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    )
-                }
+                )
             }
         }
 
@@ -145,9 +110,15 @@ fun ProfileScreen(
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
-            MenuOptionItem(icon = Icons.Default.Home, title = "Mis direcciones", onClick = { /* TODO */ })
+            MenuOptionItem(
+                icon = Icons.Default.Home, 
+                title = "Mis direcciones", 
+                onClick = { showAddressDialog = true }
+            )
+            
             Spacer(modifier = Modifier.height(12.dp))
-            MenuOptionItem(icon = Icons.Default.Info, title = "Historial de servicios", onClick = { /* TODO */ })
+            
+            MenuOptionItem(icon = Icons.Default.Info, title = "Historial de servicios", onClick = { /* Navegar a historial (que reutiliza MyReservationsScreen) */ })
 
             Spacer(modifier = Modifier.height(32.dp))
             
@@ -190,6 +161,150 @@ fun ProfileScreen(
         }
         
         Spacer(modifier = Modifier.height(80.dp))
+    }
+
+    if (showAddressDialog) {
+        AddressManagementDialog(
+            addresses = uiState.addresses,
+            onDismiss = { showAddressDialog = false },
+            onAdd = { profileViewModel.addAddress(it) },
+            onUpdate = { profileViewModel.updateAddress(it) },
+            onDelete = { profileViewModel.deleteAddress(it) },
+            onSetDefault = { profileViewModel.setDefaultAddress(it) }
+        )
+    }
+}
+
+@Composable
+fun RatingStars(rating: Double, modifier: Modifier = Modifier) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        repeat(5) { index ->
+            val color = if (index < rating.toInt()) Color(0xFFFFD700) else Color.LightGray
+            Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(text = "($rating)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddressManagementDialog(
+    addresses: List<UserAddress>,
+    onDismiss: () -> Unit,
+    onAdd: (UserAddress) -> Unit,
+    onUpdate: (UserAddress) -> Unit,
+    onDelete: (String) -> Unit,
+    onSetDefault: (String) -> Unit
+) {
+    var showForm by remember { mutableStateOf(false) }
+    var editingAddress by remember { mutableStateOf<UserAddress?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Mis Direcciones") },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                if (showForm) {
+                    AddressForm(
+                        address = editingAddress,
+                        onSave = {
+                            if (editingAddress == null) onAdd(it) else onUpdate(it.copy(id = editingAddress!!.id))
+                            showForm = false
+                            editingAddress = null
+                        },
+                        onCancel = { showForm = false; editingAddress = null }
+                    )
+                } else {
+                    Button(
+                        onClick = { showForm = true; editingAddress = null },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Agregar Nueva")
+                    }
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Box(Modifier.heightIn(max = 300.dp)) {
+                        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                            addresses.forEach { addr ->
+                                AddressItem(
+                                    address = addr,
+                                    onEdit = { editingAddress = addr; showForm = true },
+                                    onDelete = { onDelete(addr.id) },
+                                    onSetDefault = { onSetDefault(addr.id) }
+                                )
+                                Divider(Modifier.padding(vertical = 8.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Cerrar") }
+        }
+    )
+}
+
+@Composable
+fun AddressItem(
+    address: UserAddress,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onSetDefault: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                if (address.isDefault) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
+                contentDescription = null,
+                modifier = Modifier.clickable { onSetDefault() },
+                tint = if (address.isDefault) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(address.street, fontWeight = FontWeight.Bold)
+                Text("${address.neighborhood}, ${address.city}", style = MaterialTheme.typography.bodySmall)
+            }
+            IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, contentDescription = null,  modifier = Modifier.size(20.dp) ) }
+            IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = null,  modifier = Modifier.size(20.dp), tint = Color.Red) }
+        }
+    }
+}
+
+@Composable
+fun AddressForm(
+    address: UserAddress?,
+    onSave: (UserAddress) -> Unit,
+    onCancel: () -> Unit
+) {
+    var street by remember { mutableStateOf(address?.street ?: "") }
+    var neighborhood by remember { mutableStateOf(address?.neighborhood ?: "") }
+    var notes by remember { mutableStateOf(address?.notes ?: "") }
+
+    Column {
+        TextField(value = street, onValueChange = { street = it }, label = { Text("Calle / Carrera") }, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        TextField(value = neighborhood, onValueChange = { neighborhood = it }, label = { Text("Barrio") }, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        TextField(value = notes, onValueChange = { notes = it }, label = { Text("Notas (Ej: Apt 201)") }, modifier = Modifier.fillMaxWidth())
+        
+        Spacer(Modifier.height(16.dp))
+        
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = onCancel) { Text("Cancelar") }
+            Button(onClick = { onSave(UserAddress(street = street, neighborhood = neighborhood, notes = notes)) }) {
+                Text("Guardar")
+            }
+        }
     }
 }
 

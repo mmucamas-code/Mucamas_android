@@ -1,5 +1,6 @@
 package com.movil.mucamas.ui.viewmodels
 
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -18,6 +19,7 @@ import com.movil.mucamas.ui.models.UserRole
 import com.movil.mucamas.ui.repositories.CollaboratorRepository
 import com.movil.mucamas.ui.repositories.ReservationRepository
 import com.movil.mucamas.ui.repositories.ServiceRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -34,10 +36,14 @@ data class ReservationUiState(
     val isLoading: Boolean = false,
     val reservations: List<Reservation> = emptyList(),
     val isEmpty: Boolean = false,
-    val collaborators: List<Pair<UserDto, Collaborator?>> = emptyList(), // Para flujo Admin
+    val collaborators: List<Pair<UserDto, Collaborator?>> = emptyList(),
     val addressHistory: List<Address> = emptyList(),
-    val isCollaboratorAvailable: Boolean? = null, // Para flujo Cliente
-    val estimatedAvailability: String? = null // Para flujo Cliente
+    val isCollaboratorAvailable: Boolean? = null,
+    val estimatedAvailability: String? = null,
+    
+    // Filtros
+    val showOnlyToday: Boolean = false,
+    val statusFilter: ReservationStatus? = null
 )
 
 sealed interface ReservationUiEvent {
@@ -46,6 +52,7 @@ sealed interface ReservationUiEvent {
     object ReservationRated : ReservationUiEvent
     object ReservationUpdated : ReservationUiEvent
     object ShowCollaboratorSelector : ReservationUiEvent
+    object PaymentProcessed : ReservationUiEvent
 }
 
 class ReservationViewModel(
@@ -67,10 +74,31 @@ class ReservationViewModel(
 
     private val sessionManager = SessionProvider.get()
     private val db = FirebaseFirestore.getInstance()
+    
+    private var reservationsJob: Job? = null
 
     init {
-        loadReservations()
+        observeSession()
         loadAddressHistory()
+    }
+
+    private fun observeSession() {
+        viewModelScope.launch {
+            sessionManager.userSessionFlow.collect { session ->
+                _userSession.value = session
+                loadReservations()
+            }
+        }
+    }
+
+    fun toggleTodayFilter() {
+        _uiState.update { it.copy(showOnlyToday = !it.showOnlyToday) }
+        loadReservations()
+    }
+
+    fun setStatusFilter(status: ReservationStatus?) {
+        _uiState.update { it.copy(statusFilter = status) }
+        loadReservations()
     }
 
     fun checkAvailability() {
@@ -185,8 +213,21 @@ class ReservationViewModel(
         }
     }
 
-    fun processPayment(reservationId: String) {
-        updateReservationStatus(reservationId, ReservationStatus.PENDING_CONFIRMATION)
+    fun processPayment(reservationId: String, receiptUri: Uri? = null) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                // Aquí se debería subir la imagen a Firebase Storage y obtener la URL
+                val receiptUrl = receiptUri?.toString() // Placeholder
+                reservationRepository.updatePaymentStatus(reservationId, receiptUrl)
+                _eventFlow.emit(ReservationUiEvent.PaymentProcessed)
+                _eventFlow.emit(ReservationUiEvent.ReservationUpdated)
+            } catch (e: Exception) {
+                _eventFlow.emit(ReservationUiEvent.ShowError(e.message ?: "Error al procesar pago."))
+            } finally {
+                _uiState.update { it.copy(isLoading = false) }
+            }
+        }
     }
 
     fun confirmReservation(reservationId: String) {
@@ -254,16 +295,19 @@ class ReservationViewModel(
     }
 
     private fun loadReservations() {
-        viewModelScope.launch {
-            sessionManager.userSessionFlow.collect { userSession ->
-                _userSession.value = userSession
-                if (userSession != null) {
-                    reservationRepository.getReservations(userSession.userId, userSession.role)
-                        .catch { e -> _eventFlow.emit(ReservationUiEvent.ShowError("Error al cargar las reservas: ${e.message}")) }
-                        .collect { reservations -> _uiState.update { it.copy(reservations = reservations, isEmpty = reservations.isEmpty()) } }
-                } else {
-                    _uiState.update { it.copy(isEmpty = true) }
-                }
+        reservationsJob?.cancel()
+        val session = _userSession.value ?: return
+        
+        reservationsJob = viewModelScope.launch {
+            reservationRepository.getReservations(
+                userId = session.userId,
+                role = session.role,
+                onlyToday = _uiState.value.showOnlyToday,
+                statusFilter = _uiState.value.statusFilter
+            )
+            .catch { e -> _eventFlow.emit(ReservationUiEvent.ShowError("Error al cargar las reservas: ${e.message}")) }
+            .collect { reservations ->
+                _uiState.update { it.copy(reservations = reservations, isEmpty = reservations.isEmpty()) }
             }
         }
     }

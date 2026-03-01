@@ -1,8 +1,13 @@
 package com.movil.mucamas.ui.repositories
 
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.movil.mucamas.data.model.OtpData
+import com.movil.mucamas.ui.models.UserAddress
 import com.movil.mucamas.ui.models.UserDto
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 class UserRepository {
@@ -10,14 +15,8 @@ class UserRepository {
     private val firestore = FirebaseFirestore.getInstance()
     private val collection = firestore.collection("users")
 
-    /**
-     * Guarda un usuario en Firestore.
-     * Retorna Result.success con el ID del documento generado si funciona.
-     * Retorna Result.failure si falla.
-     */
     suspend fun saveUser(user: UserDto): Result<String> {
         return try {
-            // .add() genera el documentId automáticamente
             val documentReference = collection.add(user).await()
             Result.success(documentReference.id)
         } catch (e: Exception) {
@@ -26,12 +25,6 @@ class UserRepository {
         }
     }
 
-    /**
-     * Busca un usuario por su número de identificación (idNumber).
-     * Retorna Result.success con el UserDto si lo encuentra.
-     * Retorna Result.success con null si no existe.
-     * Retorna Result.failure si ocurre un error.
-     */
     suspend fun findUserByIdNumber(idNumber: String): Result<UserDto?> {
         return try {
             val querySnapshot = collection
@@ -41,9 +34,8 @@ class UserRepository {
                 .await()
 
             if (querySnapshot.isEmpty) {
-                Result.success(null) // Usuario no encontrado
+                Result.success(null)
             } else {
-                // Lo encontramos, lo convertimos al DTO y lo retornamos
                 val user = querySnapshot.documents.first().toObject(UserDto::class.java)
                 Result.success(user)
             }
@@ -52,6 +44,58 @@ class UserRepository {
             Result.failure(e)
         }
     }
+
+    fun getUserData(documentId: String): Flow<UserDto?> = callbackFlow {
+        val listener = collection.document(documentId).addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+            trySend(snapshot?.toObject(UserDto::class.java)).isSuccess
+        }
+        awaitClose { listener.remove() }
+    }
+
+    // --- CRUD de Direcciones ---
+    
+    fun getUserAddresses(documentId: String): Flow<List<UserAddress>> = callbackFlow {
+        val listener = collection.document(documentId).collection("addresses")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                val addresses = snapshot?.toObjects(UserAddress::class.java) ?: emptyList()
+                trySend(addresses).isSuccess
+            }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun addAddress(documentId: String, address: UserAddress) {
+        collection.document(documentId).collection("addresses").add(address).await()
+    }
+
+    suspend fun updateAddress(documentId: String, address: UserAddress) {
+        collection.document(documentId).collection("addresses").document(address.id).set(address).await()
+    }
+
+    suspend fun deleteAddress(documentId: String, addressId: String) {
+        collection.document(documentId).collection("addresses").document(addressId).delete().await()
+    }
+
+    suspend fun setDefaultAddress(documentId: String, addressId: String) {
+        val batch = firestore.batch()
+        val addressesRef = collection.document(documentId).collection("addresses")
+        
+        val all = addressesRef.get().await()
+        all.documents.forEach { doc ->
+            batch.update(doc.reference, "isDefault", false)
+        }
+        batch.update(addressesRef.document(addressId), "isDefault", true)
+        batch.commit().await()
+    }
+
+    // --- OTP y Otros ---
 
     suspend fun updateUserOtp(documentId: String, otpData: OtpData): Result<Boolean> {
         return try {
@@ -76,15 +120,12 @@ class UserRepository {
         }
     }
 
-    /**
-     * Resetea el contador de intentos y limpia el tiempo de bloqueo.
-     */
     suspend fun resetOtpAttempts(documentId: String): Result<Boolean> {
         return try {
             collection.document(documentId)
                 .update(
                     "otp.attempts", 0,
-                    "otp.lockedUntil", null // Eliminamos el bloqueo
+                    "otp.lockedUntil", null
                 )
                 .await()
             Result.success(true)
@@ -93,9 +134,6 @@ class UserRepository {
         }
     }
 
-    /**
-     * Incrementa el contador de intentos fallidos dentro del objeto otp.
-     */
     suspend fun incrementOtpAttempts(documentId: String, currentAttempts: Int): Result<Boolean> {
         return try {
             collection.document(documentId)
@@ -107,13 +145,10 @@ class UserRepository {
         }
     }
 
-    /**
-     * Elimina el campo 'otp' del documento del usuario.
-     */
     suspend fun clearOtpData(documentId: String): Result<Boolean> {
         return try {
             collection.document(documentId)
-                .update("otp", com.google.firebase.firestore.FieldValue.delete())
+                .update("otp", FieldValue.delete())
                 .await()
             Result.success(true)
         } catch (e: Exception) {

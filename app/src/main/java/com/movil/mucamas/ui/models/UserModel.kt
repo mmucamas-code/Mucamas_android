@@ -16,6 +16,7 @@ data class UserDto(
     val mainAddress: String = "",
     val quickRegistration: Boolean = true,
     val otp: OtpData? = null,
+    val rating: Double = 5.0, // Campo de reputación
 
     // @ServerTimestamp le dice a Firestore que use la hora del servidor al escribir
     @ServerTimestamp
@@ -40,6 +41,17 @@ data class UserDto(
         )
     }
 }
+
+data class UserAddress(
+    @DocumentId
+    val id: String = "",
+    val street: String = "",
+    val neighborhood: String = "",
+    val city: String = "Chigorodó",
+    val notes: String = "",
+    val isDefault: Boolean = false,
+    val fullAddress: String = "$street, $neighborhood, $city"
+)
 
 enum class UserRole {
     CLIENT,
